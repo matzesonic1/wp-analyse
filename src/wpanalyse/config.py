@@ -26,8 +26,11 @@ class Config:
     raum_soll_c: dict[str, float] = field(
         default_factory=lambda: {"wohnzimmer": 20.5, "bad": 22.0, "schlafzimmer": 18.0}
     )
+    raum_anteil_toleranz_k: float = 1.0
     raum_toleranz_k: float = 1.5
+    raum_unter_soll_max_stunden: float = 2.0
     raum_kritisch_c: float = 17.0
+    raum_abgleich_differenz_k: float = 1.5
 
     # Datenqualität (A7)
     max_datenluecke_min: int = 30
