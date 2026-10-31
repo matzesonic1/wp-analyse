@@ -28,6 +28,7 @@ class Config:
     )
     raum_toleranz_k: float = 1.5
     raum_kritisch_c: float = 17.0
+    raum_warnung_dauer_std: float = 2.0
 
     # Datenqualität (A7)
     max_datenluecke_min: int = 30
