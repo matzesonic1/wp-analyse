@@ -27,10 +27,12 @@ def test_tages_az_wird_bei_passender_aussentemperatur_berechnet():
 
 
 def test_niedrige_az_wird_abhaengig_von_aussentemperatur_bewertet():
-    erg = analysiere_effizienz(_tagesdaten(3.0, aussen_c=10.0), Config())
+    kalter_tag = analysiere_effizienz(_tagesdaten(2.3, aussen_c=-10.0), Config())
+    milder_tag = analysiere_effizienz(_tagesdaten(2.3, aussen_c=10.0), Config())
 
-    assert erg.bewertung == Bewertung.WARNUNG
-    assert erg.befunde[0].regel_id == "A2"
+    assert kalter_tag.bewertung == Bewertung.OK
+    assert milder_tag.bewertung == Bewertung.WARNUNG
+    assert milder_tag.befunde[0].regel_id == "A2"
 
 
 def test_heizstab_bei_milden_temperaturen_wird_gemeldet():
@@ -40,8 +42,16 @@ def test_heizstab_bei_milden_temperaturen_wird_gemeldet():
     assert erg.befunde[0].regel_id == "A4"
 
 
+def test_heizstab_am_grenzwert_loest_keine_warnung_aus():
+    erg = analysiere_effizienz(_tagesdaten(3.3, aussen_c=-5.0, heizstab_an=True), Config())
+
+    assert erg.bewertung == Bewertung.OK
+    assert erg.befunde == []
+
+
 def test_ohne_waermeenergie_nur_heizstabregel_und_hinweis():
     df = _tagesdaten(3.3, aussen_c=0.0, heizstab_an=True).drop(columns="waerme_kwh")
+    df["waerme_w"] = 1200.0
 
     erg = analysiere_effizienz(df, Config())
 

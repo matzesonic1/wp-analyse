@@ -44,7 +44,7 @@ def analysiere_effizienz(df: pd.DataFrame, cfg: Config) -> EffizienzErgebnis:
 
             erwartete_az = cfg.az_erwartung_bei_minus_10_c + (
                 aussen_c + 10
-            ) * cfg.az_erwartung_pro_grad
+            ) * cfg.az_erwartung_pro_c
             grenzwert_az = erwartete_az * (1 - cfg.az_abweichung_prozent / 100)
             if az < grenzwert_az:
                 befunde.append(Befund(
