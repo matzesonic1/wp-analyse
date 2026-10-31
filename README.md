@@ -17,6 +17,14 @@ pytest
 Die App läuft zuerst mit **simulierten Daten**. Die echte Wärmepumpe wird später über einen Adapter angebunden
 (Home Assistant, Hersteller-API oder Modbus) – siehe `docs/backlog.md`, Issue 2.
 
+## Dashboard
+```bash
+pip install -e ".[dashboard]"
+streamlit run src/wpanalyse/dashboard.py
+```
+Das Dashboard zeigt simulierte Temperatur- und Leistungsverläufe, Verdichterstarts pro Tag sowie die
+Arbeitszahl in Abhängigkeit von der Außentemperatur.
+
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|
