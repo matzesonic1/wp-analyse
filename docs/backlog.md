@@ -13,7 +13,10 @@ Jedes Issue ist so geschnitten, dass ein Agent es in einem PR erledigen kann.
 | 6 | Alarm-Grundgerüst mit Telegram/ntfy | alarm | B | – |
 | 7 | SQLite-Speicher | datensammler | B | 2 |
 | 8 | Tagesbericht | analyst | – | 1, 3, 4 |
-| 9 | Dauerbetrieb (Scheduler: sammeln → analysieren → melden) | architekt → alle | – | 6, 7 |
+| 9.1 | Scheduler-Grundlage | datensammler | C | – |
+| 9.2 | Geplante Messwerterfassung | datensammler | C | 2, 7 |
+| 9.3 | Geplante Regelprüfung und Meldungen | alarm | C | 1, 3, 4, 6 |
+| 9.4 | Dauerbetrieb-Kommando und Tagesbericht | datensammler | – | 8, 9.1, 9.2, 9.3 |
 | 10 | Dashboard (Streamlit) | analyst | – | 7 |
 
 ---
@@ -50,7 +53,39 @@ Jedes Issue ist so geschnitten, dass ein Agent es in einem PR erledigen kann.
 **Ziel:** Text/Markdown-Bericht: AZ, Starts, Laufzeit, Spreizung, Komfort je Raum, Auffälligkeiten – verständlich für Laien.
 
 ### Issue 9 – Dauerbetrieb
-**Ziel:** Kommando `python -m wpanalyse.run`: alle X Minuten sammeln, alle 15 min Regeln prüfen, täglich Bericht. Später als Docker-Container (z. B. auf Raspberry Pi / NAS).
+Issue 9 wird in vier Teil-Issues umgesetzt. Die Teil-Issues der Parallel-Gruppe C können gleichzeitig bearbeitet werden; 9.4 integriert ihre Ergebnisse.
+
+#### Issue 9.1 – Scheduler-Grundlage
+**Ziel:** Zeitgesteuerte Aufgaben mit konfigurierbarem Sammelintervall und täglichem Ausführungszeitpunkt planen.
+**Dateien:** `src/wpanalyse/config.py`, `src/wpanalyse/scheduler.py`, `tests/test_scheduler.py`.
+**Schnittstelle (Skizze):** `starte_scheduler(aufgaben: list[GeplanteAufgabe], uhr: Uhr) -> None`.
+**Akzeptanz:** Regelintervall beträgt 15 Minuten; Sammelintervall und tägliche Berichtszeit sind konfigurierbar; eine fehlerhafte Aufgabe beendet nicht den Scheduler; Zeitsteuerung ist mit einer injizierbaren Uhr testbar.
+**Testidee:** Fake-Uhr vorspulen und Aufrufzeitpunkte, Intervallgrenzen sowie Verhalten nach einem Aufgabenfehler prüfen.
+**Agent:** `datensammler`.
+
+#### Issue 9.2 – Geplante Messwerterfassung
+**Ziel:** Adapter regelmäßig auslesen und Messwerte im vorhandenen Speicher ablegen.
+**Dateien:** `src/wpanalyse/sammlung.py`, `tests/test_sammlung.py`.
+**Schnittstelle (Skizze):** `erfasse_messwerte(adapter: DatenAdapter, speicher: SQLiteSpeicher, von: datetime, bis: datetime) -> None`.
+**Akzeptanz:** Verwendet `DatenAdapter.lese(von, bis)` und `SQLiteSpeicher.speichern(...)`; ein Adapter- oder Speicherfehler wird als Aufgabenfehler gemeldet und verhindert keinen späteren Scheduler-Lauf.
+**Testidee:** Fake-Adapter und Fake-Speicher prüfen Zeitraum, neue Messwerte, leere Daten und Fehlerfälle.
+**Agent:** `datensammler`.
+
+#### Issue 9.3 – Geplante Regelprüfung und Meldungen
+**Ziel:** Gespeicherte Messwerte alle 15 Minuten analysieren und neue Befunde über das bestehende Alarm-Modul melden.
+**Dateien:** `src/wpanalyse/regelpruefung.py`, `tests/test_regelpruefung.py`.
+**Schnittstelle (Skizze):** `pruefe_regeln(speicher: SQLiteSpeicher, alarm: AlarmManager, jetzt: datetime) -> None`.
+**Akzeptanz:** Verwendet vorhandene Analysefunktionen und `AlarmManager.verarbeite(...)`; fehlende oder unzureichende Messdaten führen zu keinem Absturz; Fehler beim Melden beenden keinen späteren Scheduler-Lauf.
+**Testidee:** Synthetische Messwerte mit und ohne Befund sowie Fake-Melder für neue, entprellte und fehlerhafte Meldungen verwenden.
+**Agent:** `alarm`.
+
+#### Issue 9.4 – Dauerbetrieb-Kommando und Tagesbericht
+**Ziel:** `python -m wpanalyse.run` startet Scheduler, Erfassung, Regelprüfung und täglichen Bericht als zusammenhängenden Prozess.
+**Dateien:** `src/wpanalyse/run.py`, `docs/architektur.md`, `tests/test_run.py`.
+**Schnittstelle (Skizze):** `main() -> None`; intern werden `erfasse_messwerte(...)`, `pruefe_regeln(...)` und `erstelle_tagesbericht(...)` als geplante Aufgaben verbunden.
+**Akzeptanz:** Das Kommando sammelt im konfigurierten Intervall, prüft Regeln alle 15 Minuten und erstellt täglich genau einen Bericht; beendet sich kontrolliert bei `Ctrl+C`; der Ablauf und Datenfluss sind in der Architektur dokumentiert. Docker-Betrieb bleibt ein Folge-Issue.
+**Testidee:** Integrationstest mit Fake-Uhr, Fake-Adapter, Fake-Speicher und Fake-Melder prüft Zeitplan, Tagesbericht und kontrolliertes Beenden.
+**Agent:** `datensammler`.
 
 ### Issue 10 – Dashboard
 **Ziel:** Streamlit-App mit Verläufen (Vorlauf/Rücklauf/Außen, Leistung, Starts/Tag, AZ über Außentemperatur).
