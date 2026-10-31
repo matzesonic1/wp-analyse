@@ -12,7 +12,7 @@ from ..models import Befund, Bewertung
 class KomfortErgebnis:
     anteil_unter_soll: dict[str, float]
     kaeltester_raum: str | None
-    kaelste_mitteltemperatur_c: float | None
+    kaelteste_mitteltemperatur_c: float | None
     bewertung: Bewertung
     befunde: list[Befund] = field(default_factory=list)
 
@@ -94,7 +94,7 @@ def analysiere_komfort(df: pd.DataFrame, cfg: Config) -> KomfortErgebnis:
                 ))
 
     kaeltester_raum = min(mitteltemperaturen, key=mitteltemperaturen.get, default=None)
-    kaelste_mitteltemperatur = (
+    kaelteste_mitteltemperatur = (
         round(mitteltemperaturen[kaeltester_raum], 1) if kaeltester_raum is not None else None
     )
     sortierte_abweichungen = sorted(soll_abweichungen.items(), key=lambda eintrag: eintrag[1])
@@ -119,7 +119,7 @@ def analysiere_komfort(df: pd.DataFrame, cfg: Config) -> KomfortErgebnis:
     return KomfortErgebnis(
         anteile,
         kaeltester_raum,
-        kaelste_mitteltemperatur,
+        kaelteste_mitteltemperatur,
         bewertung,
         befunde,
     )

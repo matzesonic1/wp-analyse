@@ -3,6 +3,7 @@ import pandas as pd
 from wpanalyse.analyse.komfort import analysiere_komfort
 from wpanalyse.config import Config
 from wpanalyse.models import Bewertung
+from wpanalyse.simulation import simuliere
 
 
 def test_anteil_unter_soll_berechnet_mehrere_raeume_und_findet_kaeltesten():
@@ -20,7 +21,7 @@ def test_anteil_unter_soll_berechnet_mehrere_raeume_und_findet_kaeltesten():
 
     assert erg.anteil_unter_soll == {"wohnzimmer": 0.333, "buero": 1.0}
     assert erg.kaeltester_raum == "buero"
-    assert erg.kaelste_mitteltemperatur_c == 17.5
+    assert erg.kaelteste_mitteltemperatur_c == 17.5
     assert erg.bewertung == Bewertung.HINWEIS
     assert any("hydraulischen Abgleich" in befund.text for befund in erg.befunde)
 
@@ -48,6 +49,13 @@ def test_a6_ist_kritisch_und_fehlende_sollwerte_verhindern_a6_nicht():
     assert [befund.regel_id for befund in erg.befunde] == ["A6"]
     assert erg.anteil_unter_soll == {}
 
+    grenzwert_df = pd.DataFrame(
+        {"raum_gaestezimmer_c": [17.0, 18.0]},
+        index=index[:2],
+    )
+    grenzwert_erg = analysiere_komfort(grenzwert_df, Config())
+    assert "A6" not in {befund.regel_id for befund in grenzwert_erg.befunde}
+
 
 def test_nan_und_unregelmaessige_zeitabstaende_beeinflussen_nur_gueltige_dauer():
     index = pd.DatetimeIndex(
@@ -69,5 +77,13 @@ def test_kein_raumtemperaturfeld_liefert_leeres_ergebnis():
 
     assert erg.anteil_unter_soll == {}
     assert erg.kaeltester_raum is None
-    assert erg.kaelste_mitteltemperatur_c is None
+    assert erg.kaelteste_mitteltemperatur_c is None
     assert erg.bewertung == Bewertung.OK
+
+
+def test_simulierte_raumtemperaturen_bleiben_ohne_fehlalarm():
+    erg = analysiere_komfort(simuliere(tage=1), Config())
+
+    assert set(erg.anteil_unter_soll) == {"wohnzimmer", "schlafzimmer"}
+    assert erg.bewertung == Bewertung.OK
+    assert erg.befunde == []
