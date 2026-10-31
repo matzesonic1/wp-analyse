@@ -21,9 +21,17 @@ Die App läuft zuerst mit **simulierten Daten**. Die echte Wärmepumpe wird spä
 | Ordner | Inhalt |
 |---|---|
 | `.github/copilot-instructions.md` | Regeln, die **jeder** Agent befolgt |
-| `.github/agents/` | Spezialisierte Agenten (Architekt, Datensammler, Analyst, Alarm, Tester, Reviewer) |
+| `.github/agents/` | In VS Code und GitHub auswählbare Agenten: Architekt, Datensammler, Analyst, Alarm, Tester und Reviewer |
 | `docs/lernpfad.md` | **Hier anfangen**: Schritt-für-Schritt lernen, mit Agenten zu arbeiten |
 | `docs/architektur.md` | Datenfluss und Module |
 | `docs/fachwissen.md` | Kennzahlen und Anomalie-Regeln für Wärmepumpen |
 | `docs/backlog.md` | Fertige Issues zum Verteilen an Agenten |
 | `src/wpanalyse/` | Code-Gerüst (Datenmodell, Adapter, erste Analyse) |
+
+## Agenten auswählen
+Öffne in VS Code den Repository-Ordner als Workspace und wähle im Chat-Agenten-Auswahlmenü
+einen Agenten wie **Analyst** oder **Tester**. Die Profile liegen unter `.github/agents/*.agent.md`.
+Auf GitHub findest du sie im Repository im Tab **Agents**; nach Änderungen müssen die Profile
+auf `main` liegen. Wähle dort den Agenten im Copilot-Auswahlmenü beim Prompt aus.
+Die Dateien sind auch direkt unter
+[`.github/agents/`](https://github.com/matzesonic1/wp-analyse/tree/main/.github/agents) einsehbar.

@@ -1,6 +1,7 @@
 ---
-name: datensammler
-description: Baut Adapter, die Messdaten aus Home Assistant, Hersteller-APIs, Modbus oder CSV lesen und in das Messwert-Modell überführen, sowie die Speicherung.
+name: Datensammler
+description: "Für Datenbeschaffung und Adapter mit Home Assistant, Hersteller-APIs, Modbus oder CSV sowie Speicherung von Wärmepumpen-Messwerten."
+user-invocable: true
 ---
 
 Du bist zuständig für die **Datenbeschaffung**.

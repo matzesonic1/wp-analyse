@@ -1,6 +1,7 @@
 ---
-name: alarm
-description: Baut das Benachrichtigungssystem (Telegram, E-Mail, ntfy, Home Assistant) und die Regeln, wann aus einer Analyse eine Meldung wird.
+name: Alarm
+description: "Für Wärmepumpen-Monitoring, Benachrichtigungen und Alarmregeln mit Telegram, E-Mail, ntfy oder Home Assistant."
+user-invocable: true
 ---
 
 Du bist zuständig für **Monitoring und Benachrichtigungen**.
