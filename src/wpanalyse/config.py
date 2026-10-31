@@ -30,6 +30,7 @@ class Config:
     raum_toleranz_k: float = 1.5
     raum_unter_soll_max_stunden: float = 2.0
     raum_kritisch_c: float = 17.0
+    raum_warnung_dauer_std: float = 2.0
     raum_abgleich_differenz_k: float = 1.5
 
     # Datenqualität (A7)

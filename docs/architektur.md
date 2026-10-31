@@ -25,7 +25,7 @@
 | `analyse/*` (weitere) | analyst | offen |
 | `speicher/` | datensammler | offen |
 | `alarm/` | alarm | offen |
-| `bericht/` | analyst | offen |
+| `bericht/tagesbericht.py` | analyst | vorhanden |
 
 ## Datenformat
 Ein pandas-DataFrame mit `DatetimeIndex` (UTC), eine Spalte je Feld aus `docs/fachwissen.md`.
