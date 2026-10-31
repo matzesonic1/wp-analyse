@@ -18,6 +18,8 @@ class Config:
 
     # Effizienz (A2) und Heizstab (A4)
     az_abweichung_prozent: float = 20.0
+    az_erwartung_bei_minus_10_c: float = 2.3
+    az_erwartung_pro_grad: float = 0.1
     heizstab_max_aussen_c: float = -5.0
 
     # Komfort (A5, A6)
