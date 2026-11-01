@@ -21,6 +21,8 @@ und Anomalien meldet. Fachwissen steht in `docs/fachwissen.md` – lies es, bevo
 - Code-Kommentare und Docstrings auf Deutsch, Bezeichner auf Deutsch ohne Umlaute.
 - Vor dem Abschluss: `pytest` und `ruff check .` müssen grün sein.
 
+- Nur der Agent architekt ändert docs/backlog.md und docs/architektur.md. Andere Agenten schlagen Änderungen im PR-Text vor.
+
 ## Arbeitsweise
 - Bearbeite nur die Dateien, die dein Issue betrifft. Ändere keine Schnittstellen anderer Module ohne Hinweis im PR.
 - Beschreibe im PR: was, warum, wie getestet.
