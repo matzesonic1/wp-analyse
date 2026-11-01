@@ -1,9 +1,12 @@
+"""Tests für reproduzierbare Normaldaten und synthetische Fehlerszenarien."""
+
 import numpy as np
 
 from wpanalyse.simulation import simuliere
 
 
 def test_normalbetrieb_ohne_fehlerszenarien():
+    """Die Standardsimulation liefert vollständige Minutenwerte ohne Alarmmerkmale."""
     df = simuliere(tage=1)
 
     assert len(df) == 24 * 60
@@ -15,6 +18,7 @@ def test_normalbetrieb_ohne_fehlerszenarien():
 
 
 def test_filter_verschmutzt_erhoeht_die_spreizung():
+    """Das Filter-Szenario lässt die Spreizung im Verlauf ansteigen."""
     df = simuliere(tage=3, filter_verschmutzt=True)
     spreizung_k = (df["vorlauf_c"] - df["ruecklauf_c"])[df["verdichter_an"]]
 
@@ -22,18 +26,21 @@ def test_filter_verschmutzt_erhoeht_die_spreizung():
 
 
 def test_heizstab_szenario_ist_bei_milden_temperaturen_sichtbar():
+    """Der Heizstab ist im entsprechenden Szenario bei mildem Wetter aktiv."""
     df = simuliere(tage=1, heizstab_mild=True)
 
     assert (df["heizstab_an"] & (df["aussen_c"] > -5)).any()
 
 
 def test_kalter_raum_ist_sichtbar():
+    """Das Kälteszenario senkt die mittlere Wohnzimmer-Temperatur."""
     df = simuliere(tage=1, raum_kalt=True)
 
     assert df["raum_wohnzimmer_c"].mean() < 18
 
 
 def test_datenluecke_fehlende_zeitstempel():
+    """Das Datenlückenszenario entfernt einen zusammenhängenden Messabschnitt."""
     df = simuliere(tage=1, datenluecke=True)
     abstaende = df.index.to_series().diff().dropna()
 
@@ -42,12 +49,14 @@ def test_datenluecke_fehlende_zeitstempel():
 
 
 def test_stoerung_ist_mit_fehlercode_sichtbar():
+    """Das Störungsszenario enthält den vorgesehenen Fehlercode."""
     df = simuliere(tage=1, stoerung=True)
 
     assert df["stoerung"].dropna().tolist() == ["E101"]
 
 
 def test_zu_hohe_heizkurve_erhoeht_den_vorlauf():
+    """Eine erhöhte Heizkurve steigert die simulierte Vorlauftemperatur."""
     normal = simuliere(tage=1)
     zu_hoch = simuliere(tage=1, heizkurve_zu_hoch=True)
 
@@ -55,6 +64,7 @@ def test_zu_hohe_heizkurve_erhoeht_den_vorlauf():
 
 
 def test_abtauung_ist_in_der_betriebsart_sichtbar():
+    """Abtauphasen erscheinen bei geeigneten Bedingungen in der Betriebsart."""
     df = simuliere(tage=3, abtauen=True)
 
     assert (df["betriebsart"] == "abtauen").any()

@@ -1,1 +1,1 @@
-"""Berichte aus den Ergebnissen der Wärmepumpen-Analyse."""
+"""Erstellt lesbare Berichte aus Wärmepumpenmessungen und Analysebefunden."""

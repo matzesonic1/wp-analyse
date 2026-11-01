@@ -1,4 +1,4 @@
-"""Benachrichtigungen für erkannte Wärmepumpen-Anomalien."""
+"""Alarmverwaltung und Benachrichtigungskanäle für Analysebefunde."""
 
 from .manager import AlarmManager
 from .melder import Melder, NtfyMelder

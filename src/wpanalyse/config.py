@@ -1,10 +1,16 @@
-"""Alle Schwellwerte zentral. Nach einigen Wochen Messung an das eigene Haus anpassen."""
+"""Zentrale, objektspezifisch anpassbare Schwellwerte für die Analysen."""
 
 from dataclasses import dataclass, field
 
 
 @dataclass
 class Config:
+    """Enthält Grenzwerte und Sollwerte für Analysen und Berichte.
+
+    Die Standardwerte dienen als Startpunkt und sollten an das jeweilige Gebäude
+    und die dort installierte Wärmepumpe angepasst werden.
+    """
+
     # Taktung (Regel A1)
     max_starts_pro_tag: int = 20
     hinweis_starts_pro_tag: int = 10

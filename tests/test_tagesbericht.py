@@ -1,3 +1,5 @@
+"""Tests für Kennzahlen, Warnungen und fehlende Daten im Tagesbericht."""
+
 import pandas as pd
 
 from wpanalyse.bericht.tagesbericht import erstelle_tagesbericht
@@ -6,6 +8,7 @@ from wpanalyse.simulation import simuliere
 
 
 def test_tagesbericht_enthaelt_kennzahlen_raumkomfort_und_auffaelligkeiten():
+    """Der Bericht enthält die verfügbaren Energie-, Taktungs- und Komfortangaben."""
     df = simuliere(tage=1)
     df["waerme_kwh"] = df["waerme_w"] / 60_000
     df["strom_kwh"] = df["leistung_w"] / 60_000
@@ -24,6 +27,7 @@ def test_tagesbericht_enthaelt_kennzahlen_raumkomfort_und_auffaelligkeiten():
 
 
 def test_tagesbericht_meldet_fehlen_energiemesswerte_und_raumwarnung():
+    """Fehlende Energiespalten und anhaltend niedrige Raumtemperatur werden benannt."""
     index = pd.date_range("2026-01-10", periods=181, freq="min", tz="UTC")
     df = pd.DataFrame(
         {
@@ -44,6 +48,7 @@ def test_tagesbericht_meldet_fehlen_energiemesswerte_und_raumwarnung():
 
 
 def test_tagesbericht_meldet_taktung_und_kritisch_kalten_raum():
+    """Der Bericht weist häufige Starts und eine kritische Raumtemperatur aus."""
     index = pd.date_range("2026-01-10", periods=24 * 60, freq="min", tz="UTC")
     minute = range(len(index))
     df = pd.DataFrame(
@@ -64,6 +69,7 @@ def test_tagesbericht_meldet_taktung_und_kritisch_kalten_raum():
 
 
 def test_tagesbericht_meldet_taktung_im_hinweisbereich():
+    """Taktung im Hinweisbereich wird als Hinweis und nicht als Warnung eingestuft."""
     index = pd.date_range("2026-01-10", periods=24 * 60, freq="min", tz="UTC")
     minute = range(len(index))
     df = pd.DataFrame(
@@ -82,6 +88,7 @@ def test_tagesbericht_meldet_taktung_im_hinweisbereich():
 
 
 def test_tagesbericht_zaehlt_grosse_datenluecken_nicht_als_tagesabdeckung():
+    """Eine große Messlücke gilt nicht als ausreichende Tagesabdeckung."""
     index = pd.to_datetime(["2026-01-10 00:00", "2026-01-10 23:59"], utc=True)
     df = pd.DataFrame(
         {
@@ -99,6 +106,7 @@ def test_tagesbericht_zaehlt_grosse_datenluecken_nicht_als_tagesabdeckung():
 
 
 def test_tagesbericht_zeigt_fehlenden_tag_und_keine_messwerte():
+    """Ein angefragter Tag ohne Messwerte erhält einen verständlichen Hinweis."""
     index = pd.date_range("2026-01-10", periods=3, freq="h", tz="UTC")
     df = pd.DataFrame({"verdichter_an": [False, True, False]}, index=index)
 
@@ -109,6 +117,7 @@ def test_tagesbericht_zeigt_fehlenden_tag_und_keine_messwerte():
 
 
 def test_tagesbericht_waehlt_letzten_tag_bei_mehrtaegigen_daten():
+    """Ohne Datumsauswahl wird der letzte im DataFrame enthaltene Tag verwendet."""
     df = simuliere(tage=2)
 
     bericht = erstelle_tagesbericht(df, Config())

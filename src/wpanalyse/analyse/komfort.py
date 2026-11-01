@@ -1,4 +1,4 @@
-"""Raumkomfort-Analyse (Regeln A5 und A6)."""
+"""Bewertet Raumtemperaturen, Unterversorgung und kritische Kälte (A5 und A6)."""
 
 from dataclasses import dataclass, field
 
@@ -10,6 +10,8 @@ from ..models import Befund, Bewertung
 
 @dataclass
 class KomfortErgebnis:
+    """Komfortkennzahlen, kältester Raum, Gesamtbewertung und Befunde."""
+
     anteil_unter_soll: dict[str, float]
     kaeltester_raum: str | None
     kaelteste_mitteltemperatur_c: float | None
@@ -18,7 +20,11 @@ class KomfortErgebnis:
 
 
 def analysiere_komfort(df: pd.DataFrame, cfg: Config) -> KomfortErgebnis:
-    """Bewertet Raumtemperaturen, Soll-Abweichungen und die Regeln A5/A6."""
+    """Bewertet Raumtemperaturspalten anhand der konfigurierten Raum-Sollwerte.
+
+    Zeitanteile und zusammenhängende Untertemperaturphasen berücksichtigen nur
+    positive Messintervalle, die kürzer als die erlaubte Datenlücke sind.
+    """
     raum_spalten = [
         spalte for spalte in df.columns
         if spalte.startswith("raum_") and spalte.endswith("_c") and spalte[5:-2]
@@ -28,6 +34,7 @@ def analysiere_komfort(df: pd.DataFrame, cfg: Config) -> KomfortErgebnis:
 
     daten = df[raum_spalten].sort_index(kind="stable").apply(pd.to_numeric, errors="coerce")
     delta_s = daten.index.to_series().shift(-1).sub(daten.index.to_series()).dt.total_seconds()
+    # Große Lücken werden nicht als durchgehende Zeit unter bzw. über Soll gewertet.
     intervalle_gueltig = delta_s.gt(0) & delta_s.le(cfg.max_datenluecke_min * 60)
     anteile: dict[str, float] = {}
     mitteltemperaturen: dict[str, float] = {}

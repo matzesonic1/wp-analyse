@@ -1,4 +1,4 @@
-"""Erzeugt realistische Testdaten einer Luft-Wasser-Wärmepumpe – ohne echtes Gerät."""
+"""Erzeugt reproduzierbare synthetische Messwerte für Wärmepumpentests."""
 
 import numpy as np
 import pandas as pd
@@ -17,10 +17,23 @@ def simuliere(
     heizkurve_zu_hoch: bool = False,
     abtauen: bool = False,
 ) -> pd.DataFrame:
-    """Simuliert Minutenwerte.
+    """Erzeugt einen DataFrame mit simulierten Minutenwerten und UTC-Zeitindex.
 
-    takten=True: Verdichter läuft in kurzen Zyklen (ca. 6 min an / 9 min aus) statt in langen.
-    Die weiteren Parameter aktivieren jeweils ein synthetisches Fehlerszenario.
+    Args:
+        tage: Anzahl der zu simulierenden Tage.
+        takten: Aktiviert kurze Verdichterzyklen statt längerer Laufzeiten.
+        start: Startzeitpunkt der Messreihe.
+        seed: Zufallsstartwert für reproduzierbare Schwankungen.
+        filter_verschmutzt: Lässt die Spreizung im Verlauf ansteigen.
+        heizstab_mild: Aktiviert den Heizstab bei milden Außentemperaturen.
+        raum_kalt: Simuliert eine zu niedrige Wohnzimmer-Temperatur.
+        datenluecke: Entfernt einen zusammenhängenden Messzeitraum.
+        stoerung: Fügt einen synthetischen Fehlercode ein.
+        heizkurve_zu_hoch: Erhöht die simulierte Vorlauftemperatur.
+        abtauen: Fügt Abtauphasen bei passenden Außentemperaturen ein.
+
+    Returns:
+        Messwerte mit Zeitindex und Projektfeldnamen.
     """
     rng = np.random.default_rng(seed)
     index = pd.date_range(start, periods=tage * 24 * 60, freq="1min", tz="UTC")
@@ -29,7 +42,7 @@ def simuliere(
 
     aussen_c = 0 + 4 * np.sin((stunde - 9) / 24 * 2 * np.pi) + rng.normal(0, 0.3, len(index))
 
-    # Ein/Aus-Zyklen des Verdichters
+    # Definiert die Lauf- und Stillstandszeit eines Verdichterzyklus.
     if takten:
         an_min, aus_min = 6, 9
     else:

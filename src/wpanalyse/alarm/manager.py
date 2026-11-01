@@ -1,4 +1,4 @@
-"""Entprellung und Entwarnung für Analysebefunde."""
+"""Verwaltet aktive Befunde, Wiederholungsintervalle und Entwarnungen."""
 
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
@@ -8,9 +8,14 @@ from .melder import Melder
 
 
 class AlarmManager:
-    """Versendet neue Befunde, begrenzt Wiederholungen und meldet Entwarnungen."""
+    """Versendet neue Befunde, begrenzt Wiederholungen und meldet Entwarnungen.
+
+    Der Manager erwartet bei jedem Aufruf den vollständigen aktuellen
+    Befundstand. Befunde werden anhand ihrer Regel-ID als aktiv nachverfolgt.
+    """
 
     def __init__(self, melder: Melder, entprellzeit: timedelta = timedelta(hours=6)) -> None:
+        """Initialisiert den Meldekanal und das Mindestintervall für Wiederholungen."""
         if entprellzeit < timedelta(0):
             raise ValueError("Die Entprellzeit darf nicht negativ sein.")
         self.melder = melder
@@ -19,7 +24,12 @@ class AlarmManager:
         self._aktive_befunde: dict[str, Befund] = {}
 
     def verarbeite(self, befunde: Iterable[Befund], jetzt: datetime | None = None) -> None:
-        """Verarbeitet den vollständigen aktuellen Befundstand."""
+        """Meldet neue oder erneut fällige Befunde und Entwarnungen.
+
+        Args:
+            befunde: Vollständige Liste der aktuellen Analysebefunde.
+            jetzt: Optionaler zonierter Zeitpunkt, nützlich für reproduzierbare Abläufe.
+        """
         zeitpunkt = jetzt or datetime.now(UTC)
         if zeitpunkt.tzinfo is None or zeitpunkt.utcoffset() is None:
             raise ValueError("Der Zeitpunkt muss eine Zeitzone enthalten.")

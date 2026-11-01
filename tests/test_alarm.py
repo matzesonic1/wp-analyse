@@ -1,3 +1,5 @@
+"""Tests für Alarmformatierung, Entprellung und den ntfy-Melder."""
+
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
@@ -7,14 +9,19 @@ from wpanalyse.models import Befund, Bewertung
 
 
 class FakeMelder:
+    """Sammelt versendete Nachrichten für Assertions ohne Netzwerkzugriff."""
+
     def __init__(self):
+        """Initialisiert die Liste der aufgezeichneten Nachrichten."""
         self.nachrichten = []
 
     def sende(self, nachricht: str) -> None:
+        """Speichert eine Nachricht, statt sie tatsächlich zu versenden."""
         self.nachrichten.append(nachricht)
 
 
 def test_meldet_befunde_mit_passendem_schweregrad():
+    """Jeder nicht-ok-Befund erhält die zugehörige Schweregradbezeichnung."""
     melder = FakeMelder()
     manager = AlarmManager(melder)
 
@@ -35,6 +42,7 @@ def test_meldet_befunde_mit_passendem_schweregrad():
 
 
 def test_entprellt_wiederholungen_fuer_sechs_stunden():
+    """Wiederholungen werden erst nach Ablauf der Entprellzeit gesendet."""
     melder = FakeMelder()
     manager = AlarmManager(melder)
     befund = Befund("A1", Bewertung.WARNUNG, "Warnung")
@@ -48,6 +56,7 @@ def test_entprellt_wiederholungen_fuer_sechs_stunden():
 
 
 def test_sendet_einmalige_entwarnung_wenn_befund_verschwindet():
+    """Ein nicht mehr aktiver Befund löst genau eine Entwarnung aus."""
     melder = FakeMelder()
     manager = AlarmManager(melder)
     befund = Befund("A1", Bewertung.WARNUNG, "Warnung")
@@ -60,6 +69,7 @@ def test_sendet_einmalige_entwarnung_wenn_befund_verschwindet():
 
 
 def test_ntfy_melder_sendet_nachricht_mit_konfiguration():
+    """Der ntfy-Melder baut POST-Anfrage, Ziel und Authentifizierung korrekt auf."""
     melder = NtfyMelder("waermepumpe", "https://ntfy.example", "test-token-not-real")
 
     with patch("wpanalyse.alarm.melder.urlopen", return_value=nullcontext()) as urlopen_mock:

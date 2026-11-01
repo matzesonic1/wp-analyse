@@ -1,4 +1,4 @@
-"""Liest Messwerte einer Novelan LADV9 über die Home-Assistant-REST-API."""
+"""Liest und konvertiert Novelan-Messwerte über die Home-Assistant-REST-API."""
 
 import json
 import os
@@ -40,7 +40,11 @@ _ZAHL_FELDER = {
 
 
 class NovelanLadv9Adapter(DatenAdapter):
-    """Liest konfigurierte Home-Assistant-Entitäten als Messwerte der Novelan LADV9."""
+    """Liest konfigurierte Home-Assistant-Entitäten als Novelan-Messwerte.
+
+    URL, Token und Entitäts-IDs können direkt übergeben oder aus
+    Umgebungsvariablen gelesen werden.
+    """
 
     def __init__(
         self,
@@ -49,6 +53,12 @@ class NovelanLadv9Adapter(DatenAdapter):
         sensoren: Mapping[str, str] | None = None,
         timeout: float = 30,
     ):
+        """Legt API-Zugang, Feldzuordnungen und Anfrage-Timeout fest.
+
+        ``sensoren`` ordnet Projektfeldnamen den Home-Assistant-Entity-IDs zu.
+        Ohne explizite Zuordnung werden konfigurierte Entity-IDs aus der
+        jeweiligen ``NOVELAN_ENTITY_*``-Umgebungsvariable gelesen.
+        """
         self.ha_url = (ha_url or os.getenv("HA_URL", "")).rstrip("/")
         self.token = token or os.getenv("HA_TOKEN", "")
         self.sensoren = (
@@ -67,6 +77,7 @@ class NovelanLadv9Adapter(DatenAdapter):
             raise ValueError("Mindestens eine Novelan-Home-Assistant-Entität muss konfiguriert sein.")
 
     def lese(self, von: datetime, bis: datetime) -> pd.DataFrame:
+        """Lädt den Entity-Verlauf im halboffenen Zeitraum ``[von, bis)``."""
         von_utc = _utc_zeit(von)
         bis_utc = _utc_zeit(bis)
         parameter = urlencode(
@@ -85,17 +96,24 @@ class NovelanLadv9Adapter(DatenAdapter):
         return df[(df.index >= von_utc) & (df.index < bis_utc)]
 
     def aktuell(self) -> pd.DataFrame:
+        """Lädt die derzeitigen Zustände aller konfigurierten Entitäten."""
         zustaende = self._anfrage(f"{self.ha_url}/api/states")
         return self._als_dataframe(
             zustand for zustand in zustaende if zustand.get("entity_id") in self.sensoren.values()
         )
 
     def _anfrage(self, url: str) -> list:
+        """Sendet eine authentifizierte GET-Anfrage und dekodiert die JSON-Antwort."""
         anfrage = Request(url, headers={"Authorization": "Bearer " + self.token})
         with urlopen(anfrage, timeout=self.timeout) as antwort:
             return json.load(antwort)
 
     def _als_dataframe(self, zustaende) -> pd.DataFrame:
+        """Ordnet API-Zustände nach Zeit und Projektfeld zu einem DataFrame.
+
+        Zustände mit identischem Zeitstempel werden in derselben Zeile gesammelt;
+        nicht konfigurierte Entitäten und Zustände ohne Zeitangabe werden ignoriert.
+        """
         entity_felder: dict[str, list[str]] = {}
         for feld, entity_id in self.sensoren.items():
             entity_felder.setdefault(entity_id, []).append(feld)
@@ -122,6 +140,7 @@ class NovelanLadv9Adapter(DatenAdapter):
 
 
 def _utc_zeit(zeit: datetime) -> pd.Timestamp:
+    """Interpretiert naive Zeiten als UTC und konvertiert zonierte Zeiten nach UTC."""
     zeitstempel = pd.Timestamp(zeit)
     if zeitstempel.tzinfo is None:
         return zeitstempel.tz_localize("UTC")
@@ -129,6 +148,11 @@ def _utc_zeit(zeit: datetime) -> pd.Timestamp:
 
 
 def _messwert(feld: str, zustand: str | None):
+    """Konvertiert einen Home-Assistant-Zustand entsprechend dem Projektfeld.
+
+    Nicht verfügbare, unbekannte oder nicht parsebare Werte werden als
+    ``pd.NA`` zurückgegeben.
+    """
     if zustand is None or str(zustand).lower() in {"", "unknown", "unavailable", "none"}:
         return pd.NA
     if feld in _BOOL_FELDER:

@@ -1,4 +1,4 @@
-"""Benachrichtigungskanäle für Alarme."""
+"""Schnittstelle und Implementierung für Alarm-Benachrichtigungen."""
 
 import os
 from typing import Protocol
@@ -7,14 +7,14 @@ from urllib.request import Request, urlopen
 
 
 class Melder(Protocol):
-    """Gemeinsame Schnittstelle für Benachrichtigungskanäle."""
+    """Struktureller Vertrag für austauschbare Benachrichtigungskanäle."""
 
     def sende(self, nachricht: str) -> None:
-        """Sendet eine Nachricht."""
+        """Sendet eine formatierte Alarmnachricht."""
 
 
 class NtfyMelder:
-    """Sendet Nachrichten an ein ntfy-Thema."""
+    """Sendet UTF-8-Textnachrichten an ein ntfy-Thema."""
 
     def __init__(
         self,
@@ -23,6 +23,11 @@ class NtfyMelder:
         token: str | None = None,
         timeout_s: float = 10.0,
     ) -> None:
+        """Konfiguriert ntfy-Ziel, optionale Authentifizierung und Timeout.
+
+        Fehlende Werte werden, sofern vorhanden, aus ``NTFY_TOPIC``,
+        ``NTFY_URL`` und ``NTFY_TOKEN`` übernommen.
+        """
         self.thema = thema or os.getenv("NTFY_TOPIC")
         self.server_url = (server_url or os.getenv("NTFY_URL") or "https://ntfy.sh").rstrip("/")
         self.token = token or os.getenv("NTFY_TOKEN")
@@ -34,7 +39,7 @@ class NtfyMelder:
             raise ValueError("NTFY_URL muss eine HTTP- oder HTTPS-Adresse sein.")
 
     def sende(self, nachricht: str) -> None:
-        """Sendet eine Nachricht an das konfigurierte ntfy-Thema."""
+        """Sendet die Nachricht per HTTP-POST an das konfigurierte Thema."""
         url = f"{self.server_url}/{quote(self.thema, safe='')}"
         headers = {"Content-Type": "text/plain; charset=utf-8"}
         if self.token:

@@ -1,3 +1,5 @@
+"""Tests für Zeitfilter, Zustandskonvertierung und Konfiguration des Novelan-Adapters."""
+
 import json
 from datetime import UTC, datetime
 from io import BytesIO
@@ -11,10 +13,12 @@ from wpanalyse.adapters.novelan_ladv9 import NovelanLadv9Adapter
 
 
 def _antwort(daten):
+    """Erzeugt einen dateiähnlichen JSON-Response für den API-Mock."""
     return BytesIO(json.dumps(daten).encode())
 
 
 def _adapter():
+    """Erstellt einen Adapter mit Testzugangsdaten und Beispielentitäten."""
     return NovelanLadv9Adapter(
         ha_url="http://homeassistant.local:8123",
         token="test-token",
@@ -26,6 +30,7 @@ def _adapter():
 
 
 def test_lese_ordnet_verlauf_zu_und_filtert_zeitraum():
+    """Der Verlauf wird nach Entität zugeordnet und auf [von, bis) begrenzt."""
     verlauf = [
         [
             {"entity_id": "sensor.aussen", "state": "4.5", "last_changed": "2026-01-01T00:00:00+00:00"},
@@ -60,6 +65,7 @@ def test_lese_ordnet_verlauf_zu_und_filtert_zeitraum():
 
 
 def test_aktuell_liefert_aktuelle_zustaende_und_ignoriert_andere_entitaeten():
+    """Aktuelle Werte konfigurierter Entitäten werden aus der API-Antwort gelesen."""
     zustaende = [
         {
             "entity_id": "sensor.aussen",
@@ -86,6 +92,7 @@ def test_aktuell_liefert_aktuelle_zustaende_und_ignoriert_andere_entitaeten():
 
 
 def test_adapter_benoetigt_ha_zugangsdaten(monkeypatch):
+    """Ohne Home-Assistant-URL oder Token schlägt die Initialisierung fehl."""
     monkeypatch.delenv("HA_URL", raising=False)
     monkeypatch.delenv("HA_TOKEN", raising=False)
     with pytest.raises(ValueError, match="HA_URL und HA_TOKEN"):

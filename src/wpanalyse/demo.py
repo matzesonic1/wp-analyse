@@ -1,4 +1,4 @@
-"""Demo: simulierte Daten erzeugen und Taktung bewerten.  Aufruf: python -m wpanalyse.demo"""
+"""Demonstriert die Taktungsanalyse mit synthetischen Betriebsdaten."""
 
 from .analyse.taktung import analysiere_taktung
 from .config import Config
@@ -6,6 +6,7 @@ from .simulation import simuliere
 
 
 def main() -> None:
+    """Vergleicht die Analyseergebnisse für Normalbetrieb und häufiges Takten."""
     cfg = Config()
     for name, takten in [("Normalbetrieb", False), ("Taktender Betrieb", True)]:
         df = simuliere(tage=3, takten=takten)

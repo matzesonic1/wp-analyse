@@ -1,4 +1,4 @@
-"""Taktungs-Analyse (Regel A1). Dient als MUSTER für weitere Analyse-Module."""
+"""Ermittelt Verdichterstarts und Laufzeitkennzahlen für Regel A1."""
 
 from dataclasses import dataclass, field
 
@@ -10,6 +10,8 @@ from ..models import Befund, Bewertung
 
 @dataclass
 class TaktungErgebnis:
+    """Kennzahlen und Bewertung der Verdichtertaktung."""
+
     starts_pro_tag: float
     mittlere_laufzeit_min: float
     bewertung: Bewertung
@@ -17,7 +19,11 @@ class TaktungErgebnis:
 
 
 def analysiere_taktung(df: pd.DataFrame, cfg: Config) -> TaktungErgebnis:
-    """Zählt Verdichterstarts und misst die mittlere Laufzeit pro Zyklus."""
+    """Berechnet Starts pro Tag und mittlere Dauer erkannter Verdichterzyklen.
+
+    Erwartet einen zeitlich sortierten DataFrame mit ``verdichter_an`` und
+    DatetimeIndex.
+    """
     an = df["verdichter_an"].fillna(False).astype(bool)
     starts = an & ~an.shift(1, fill_value=False)
     anzahl_starts = int(starts.sum())
@@ -25,7 +31,7 @@ def analysiere_taktung(df: pd.DataFrame, cfg: Config) -> TaktungErgebnis:
     tage = max((df.index[-1] - df.index[0]).total_seconds() / 86400, 1 / 24)
     starts_pro_tag = anzahl_starts / tage
 
-    # Laufzeit je Zyklus: Minuten 'an' je Zyklus-Nummer
+    # Gruppiert eingeschaltete Messpunkte anhand des jeweils erkannten Starts.
     zyklus_nr = starts.cumsum()
     abtast_min = pd.Series(df.index).diff().median().total_seconds() / 60
     laufzeiten = an[an].groupby(zyklus_nr[an]).size() * abtast_min

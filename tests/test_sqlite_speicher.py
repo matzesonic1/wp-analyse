@@ -1,3 +1,5 @@
+"""Tests für Persistenz, Aktualisierung und Zeitraumabfragen des SQLite-Speichers."""
+
 from datetime import UTC, datetime
 
 import pandas as pd
@@ -6,6 +8,7 @@ from wpanalyse.speicher import SQLiteSpeicher
 
 
 def test_speichert_und_laesst_zeitraum_mit_utc_index(tmp_path):
+    """Messwerte bleiben nach erneutem Öffnen samt UTC-Index und fehlenden Werten erhalten."""
     pfad = tmp_path / "messwerte.sqlite"
     zeit = pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC")
     df = pd.DataFrame(
@@ -28,6 +31,7 @@ def test_speichert_und_laesst_zeitraum_mit_utc_index(tmp_path):
 
 
 def test_speichern_aktualisiert_doppelten_zeitstempel(tmp_path):
+    """Ein erneut gespeicherter Zeitstempel ersetzt den vorhandenen Datensatz."""
     with SQLiteSpeicher(tmp_path / "messwerte.sqlite") as speicher:
         zeit = pd.date_range("2026-01-01", periods=1, tz="UTC")
         speicher.speichern(pd.DataFrame({"vorlauf_c": [30.0]}, index=zeit))
@@ -39,6 +43,7 @@ def test_speichern_aktualisiert_doppelten_zeitstempel(tmp_path):
 
 
 def test_laden_leerer_zeitraum_bewahrt_spalten_und_utc_index(tmp_path):
+    """Auch ein leerer Lesezeitraum behält bekannte Spalten und UTC-Zeitzone."""
     with SQLiteSpeicher(tmp_path / "messwerte.sqlite") as speicher:
         speicher.speichern(pd.DataFrame(columns=["vorlauf_c"], index=pd.DatetimeIndex([], tz="UTC")))
 

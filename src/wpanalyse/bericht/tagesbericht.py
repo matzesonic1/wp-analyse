@@ -1,4 +1,4 @@
-"""Erstellt einen laienverständlichen Markdown-Tagesbericht."""
+"""Formatiert Tageskennzahlen und Auffälligkeiten als verständlichen Markdown-Bericht."""
 
 from datetime import date
 
@@ -13,7 +13,16 @@ from ..models import Befund, Bewertung
 def erstelle_tagesbericht(
     df: pd.DataFrame, cfg: Config, tag: date | str | None = None
 ) -> str:
-    """Erstellt einen Bericht für den angegebenen oder letzten Messtag."""
+    """Erstellt einen Bericht mit Kennzahlen, Raumkomfort und Befunden.
+
+    Args:
+        df: Messreihe mit DatetimeIndex und verfügbaren Projektfeldern.
+        cfg: Schwellwerte und Raum-Solltemperaturen für die Bewertung.
+        tag: Berichtsdatum; ohne Angabe wird der letzte Messtag verwendet.
+
+    Returns:
+        Markdown-Text für den gewählten Tag oder einen Hinweis bei fehlenden Daten.
+    """
     if not isinstance(df.index, pd.DatetimeIndex):
         raise TypeError("Der DataFrame benötigt einen DatetimeIndex.")
 
@@ -116,6 +125,7 @@ def erstelle_tagesbericht(
 
 
 def _az_fehlgrund(df: pd.DataFrame) -> str:
+    """Beschreibt, warum für die Messreihe keine Tagesarbeitszahl vorliegt."""
     fehlende = {"waerme_kwh", "strom_kwh"} - set(df.columns)
     if fehlende:
         return f"{', '.join(sorted(fehlende))} fehlt"
@@ -125,6 +135,11 @@ def _az_fehlgrund(df: pd.DataFrame) -> str:
 def _taktungswerte(
     df: pd.DataFrame, cfg: Config
 ) -> tuple[int | None, float | None, float, float | None]:
+    """Ermittelt Starts, Laufzeit, zeitliche Abdeckung und vollständige Zyklusdauer.
+
+    Messintervalle, die nicht positiv oder länger als die konfigurierte
+    maximale Datenlücke sind, gehen nicht in die Dauerkennzahlen ein.
+    """
     if "verdichter_an" not in df:
         return None, None, 0.0, None
 
@@ -184,6 +199,7 @@ def _taktungswerte(
 
 
 def _raumkomfort(df: pd.DataFrame, cfg: Config) -> tuple[list[str], list[Befund]]:
+    """Erzeugt Raumzeilen und Komfortbefunde für den Tagesbericht."""
     raum_spalten = sorted(
         spalte for spalte in df.columns
         if spalte.startswith("raum_") and spalte.endswith("_c")

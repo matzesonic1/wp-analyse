@@ -1,3 +1,5 @@
+"""Tests für Raumtemperaturanteile, Komfortbefunde und Datenlücken."""
+
 import pandas as pd
 
 from wpanalyse.analyse.komfort import analysiere_komfort
@@ -7,6 +9,7 @@ from wpanalyse.simulation import simuliere
 
 
 def test_anteil_unter_soll_berechnet_mehrere_raeume_und_findet_kaeltesten():
+    """Die Analyse vergleicht mehrere Räume und identifiziert den kältesten."""
     index = pd.date_range("2026-01-01", periods=4, freq="min", tz="UTC")
     df = pd.DataFrame(
         {
@@ -27,6 +30,7 @@ def test_anteil_unter_soll_berechnet_mehrere_raeume_und_findet_kaeltesten():
 
 
 def test_a5_loest_erst_nach_mehr_als_zwei_stunden_aus():
+    """Die Komfortwarnung entsteht erst nach Überschreiten der Zeitgrenze."""
     index = pd.date_range("2026-01-01", periods=182, freq="min", tz="UTC")
     df = pd.DataFrame({"raum_wohnzimmer_c": [18.0] * len(index)}, index=index)
     cfg = Config(raum_soll_c={"wohnzimmer": 20.0})
@@ -40,6 +44,7 @@ def test_a5_loest_erst_nach_mehr_als_zwei_stunden_aus():
 
 
 def test_a6_ist_kritisch_und_fehlende_sollwerte_verhindern_a6_nicht():
+    """Kritische Kälte gilt auch für Räume ohne konfigurierten Sollwert."""
     index = pd.date_range("2026-01-01", periods=3, freq="min", tz="UTC")
     df = pd.DataFrame({"raum_gaestezimmer_c": [18.0, 16.9, 18.0]}, index=index)
 
@@ -58,6 +63,7 @@ def test_a6_ist_kritisch_und_fehlende_sollwerte_verhindern_a6_nicht():
 
 
 def test_nan_und_unregelmaessige_zeitabstaende_beeinflussen_nur_gueltige_dauer():
+    """Fehlende Werte und unzulässige Zeitabstände werden nicht mitgezählt."""
     index = pd.DatetimeIndex(
         ["2026-01-01T00:00Z", "2026-01-01T00:01Z", "2026-01-01T00:03Z", "2026-01-01T00:04Z"]
     )
@@ -71,6 +77,7 @@ def test_nan_und_unregelmaessige_zeitabstaende_beeinflussen_nur_gueltige_dauer()
 
 
 def test_kein_raumtemperaturfeld_liefert_leeres_ergebnis():
+    """Ohne Raumspalten gibt die Analyse ein neutrales Ergebnis zurück."""
     erg = analysiere_komfort(pd.DataFrame(index=pd.date_range(
         "2026-01-01", periods=1, tz="UTC"
     )), Config())
@@ -82,6 +89,7 @@ def test_kein_raumtemperaturfeld_liefert_leeres_ergebnis():
 
 
 def test_simulierte_raumtemperaturen_bleiben_ohne_fehlalarm():
+    """Simulierte Normaltemperaturen erzeugen keine Komfortbefunde."""
     erg = analysiere_komfort(simuliere(tage=1), Config())
 
     assert set(erg.anteil_unter_soll) == {"wohnzimmer", "schlafzimmer"}

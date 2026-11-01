@@ -1,4 +1,4 @@
-"""Speicherung von Messwerten."""
+"""Speicherschnittstellen und Implementierungen für Messreihen."""
 
 from .sqlite import SQLiteSpeicher
 

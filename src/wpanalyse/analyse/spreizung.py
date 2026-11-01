@@ -1,4 +1,4 @@
-"""Spreizungs-Analyse (Regel A3)."""
+"""Bewertet die Temperaturdifferenz zwischen Vorlauf und Rücklauf (Regel A3)."""
 
 from dataclasses import dataclass, field
 
@@ -10,13 +10,19 @@ from ..models import Befund, Bewertung
 
 @dataclass
 class SpreizungErgebnis:
+    """Mittlere Spreizung sowie Bewertung und gegebenenfalls Befunde."""
+
     mittlere_spreizung_k: float
     bewertung: Bewertung
     befunde: list[Befund] = field(default_factory=list)
 
 
 def analysiere_spreizung(df: pd.DataFrame, cfg: Config) -> SpreizungErgebnis:
-    """Berechnet die Spreizung bei laufendem Verdichter und prüft Regel A3."""
+    """Berechnet die Spreizung während des Verdichterbetriebs und prüft A3.
+
+    Für den langfristigen Vergleich werden das 7-Tage-Mittel und das
+    30-Tage-Mittel der verfügbaren Messreihe herangezogen.
+    """
     spreizung = (df["vorlauf_c"] - df["ruecklauf_c"])[
         df["verdichter_an"].fillna(False).astype(bool)
     ].dropna()

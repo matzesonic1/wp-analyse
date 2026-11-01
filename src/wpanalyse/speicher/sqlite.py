@@ -1,4 +1,4 @@
-"""Speichert Messwerte in einer SQLite-Datenbank."""
+"""Persistiert DataFrame-Messreihen in einer SQLite-Datenbank."""
 
 import json
 import sqlite3
@@ -10,9 +10,14 @@ import pandas as pd
 
 
 class SQLiteSpeicher:
-    """Speichert DataFrames mit Zeitindex und lädt sie für einen Zeitraum."""
+    """Speichert Messreihen mit UTC-Normalisierung und Zeitraumabfragen.
+
+    Zeitstempel sind eindeutig: Wird derselbe Zeitpunkt erneut gespeichert,
+    ersetzt der neue Datensatz den zuvor gespeicherten.
+    """
 
     def __init__(self, pfad: str | Path):
+        """Öffnet oder erstellt die Datenbank am angegebenen Pfad."""
         if str(pfad) != ":memory:":
             Path(pfad).parent.mkdir(parents=True, exist_ok=True)
         self._verbindung = sqlite3.connect(pfad)
@@ -27,7 +32,12 @@ class SQLiteSpeicher:
             )
 
     def speichern(self, df: pd.DataFrame) -> None:
-        """Speichert Messwerte anhand ihres DatetimeIndex."""
+        """Speichert DataFrame-Zeilen anhand ihres DatetimeIndex.
+
+        Naive Zeitstempel werden als UTC interpretiert; zonierte Zeitstempel
+        werden nach UTC konvertiert. Wiederholte Zeitstempel aktualisieren
+        bestehende Datensätze.
+        """
         if not isinstance(df.index, pd.DatetimeIndex):
             raise TypeError("Der DataFrame benötigt einen DatetimeIndex.")
         if df.index.hasnans:
@@ -63,7 +73,11 @@ class SQLiteSpeicher:
             )
 
     def lese(self, von: datetime, bis: datetime) -> pd.DataFrame:
-        """Lädt Messwerte im Zeitraum [von, bis) mit UTC-DatetimeIndex."""
+        """Lädt Messwerte im halboffenen Zeitraum ``[von, bis)``.
+
+        Der zurückgegebene DataFrame besitzt einen UTC-DatetimeIndex und behält
+        auch bei leerem Ergebnis die bekannten Spaltennamen bei.
+        """
         von_ns = self._zeit_ns(von)
         bis_ns = self._zeit_ns(bis)
         zeilen = self._verbindung.execute(
@@ -84,6 +98,7 @@ class SQLiteSpeicher:
 
     @staticmethod
     def _zeit_ns(zeit: datetime) -> int:
+        """Konvertiert einen Zeitpunkt in UTC-Nanosekunden seit der Epoche."""
         zeitstempel = pd.Timestamp(zeit)
         if zeitstempel.tz is None:
             zeitstempel = zeitstempel.tz_localize("UTC")
@@ -92,11 +107,13 @@ class SQLiteSpeicher:
         return zeitstempel.value
 
     def close(self) -> None:
-        """Schließt die Datenbankverbindung."""
+        """Schließt die SQLite-Verbindung."""
         self._verbindung.close()
 
     def __enter__(self) -> Self:
+        """Gibt den Speicher für eine ``with``-Anweisung zurück."""
         return self
 
     def __exit__(self, *exc_info: object) -> None:
+        """Schließt die Verbindung beim Verlassen einer ``with``-Anweisung."""
         self.close()
