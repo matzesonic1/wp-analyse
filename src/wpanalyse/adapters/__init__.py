@@ -1,0 +1,1 @@
+"""Adapter zum Einlesen von Messdaten aus externen Quellen."""

@@ -1,10 +1,16 @@
-"""Alle Schwellwerte zentral. Nach einigen Wochen Messung an das eigene Haus anpassen."""
+"""Zentrale, objektspezifisch anpassbare Schwellwerte für die Analysen."""
 
 from dataclasses import dataclass, field
 
 
 @dataclass
 class Config:
+    """Enthält Grenzwerte und Sollwerte für Analysen und Berichte.
+
+    Die Standardwerte dienen als Startpunkt und sollten an das jeweilige Gebäude
+    und die dort installierte Wärmepumpe angepasst werden.
+    """
+
     # Taktung (Regel A1)
     max_starts_pro_tag: int = 20
     hinweis_starts_pro_tag: int = 10
@@ -26,8 +32,12 @@ class Config:
     raum_soll_c: dict[str, float] = field(
         default_factory=lambda: {"wohnzimmer": 20.5, "bad": 22.0, "schlafzimmer": 18.0}
     )
+    raum_anteil_toleranz_k: float = 1.0
     raum_toleranz_k: float = 1.5
+    raum_unter_soll_max_stunden: float = 2.0
     raum_kritisch_c: float = 17.0
+    raum_warnung_dauer_std: float = 2.0
+    raum_abgleich_differenz_k: float = 1.5
 
     # Datenqualität (A7)
     max_datenluecke_min: int = 30

@@ -1,3 +1,5 @@
+"""Tests für Spreizungskennzahlen und die Erkennung eines langfristigen Anstiegs."""
+
 import pandas as pd
 
 from wpanalyse.analyse.spreizung import analysiere_spreizung
@@ -7,6 +9,7 @@ from wpanalyse.simulation import simuliere
 
 
 def test_normalbetrieb_ohne_fehlalarm_und_mittel_nur_bei_laufendem_verdichter():
+    """Im Normalbetrieb wird nur die Spreizung während des Verdichterlaufs gemittelt."""
     erg = analysiere_spreizung(simuliere(tage=3, takten=False), Config())
 
     assert erg.bewertung == Bewertung.OK
@@ -15,6 +18,7 @@ def test_normalbetrieb_ohne_fehlalarm_und_mittel_nur_bei_laufendem_verdichter():
 
 
 def test_verschmutzter_filter_wird_nach_anstieg_erkannt():
+    """Ein Anstieg des 7-Tage-Mittels löst den Hinweis nach A3 aus."""
     index = pd.date_range("2026-01-01", periods=31, freq="D", tz="UTC")
     spreizung = [5.0] * 24 + [8.0] * 7
     df = pd.DataFrame(

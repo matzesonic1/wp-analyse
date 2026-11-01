@@ -1,4 +1,4 @@
-"""Effizienz- und Heizstab-Analyse (Regeln A2 und A4)."""
+"""Berechnet die temperaturabhängige Arbeitszahl und prüft den Heizstabeinsatz."""
 
 from dataclasses import dataclass, field
 
@@ -10,13 +10,20 @@ from ..models import Befund, Bewertung
 
 @dataclass
 class EffizienzErgebnis:
+    """Tagesarbeitszahlen, Gesamtbewertung und zugehörige Befunde."""
+
     tages_az: dict[str, float]
     bewertung: Bewertung
     befunde: list[Befund] = field(default_factory=list)
 
 
 def analysiere_effizienz(df: pd.DataFrame, cfg: Config) -> EffizienzErgebnis:
-    """Berechnet die Tages-AZ, bewertet sie nach Außentemperatur und prüft den Heizstab."""
+    """Bewertet Tagesarbeitszahlen und Heizstabmesswerte.
+
+    Die Arbeitszahl wird aus Wärme- und Stromenergie je Kalendertag berechnet.
+    Die Bewertung der Arbeitszahl berücksichtigt die mittlere Außentemperatur
+    des jeweiligen Tages.
+    """
     befunde: list[Befund] = []
     tages_az: dict[str, float] = {}
 

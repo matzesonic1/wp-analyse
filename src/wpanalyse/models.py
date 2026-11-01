@@ -6,6 +6,8 @@ from enum import Enum
 
 
 class Bewertung(str, Enum):
+    """Schweregrad eines Analysebefunds in aufsteigender Reihenfolge."""
+
     OK = "ok"
     HINWEIS = "hinweis"
     WARNUNG = "warnung"
@@ -14,7 +16,11 @@ class Bewertung(str, Enum):
 
 @dataclass
 class Messwert:
-    """Ein Messzeitpunkt. Fehlende Werte sind None."""
+    """Messwerte zu einem Zeitpunkt; nicht erfasste Einzelwerte sind ``None``.
+
+    Temperaturen werden in Grad Celsius, Leistung in Watt und Wärmeleistung in
+    Watt angegeben. Der Zeitstempel sollte eine Zeitzone enthalten.
+    """
 
     zeit: datetime
     aussen_c: float | None = None
@@ -32,7 +38,11 @@ class Messwert:
 
 @dataclass
 class Befund:
-    """Ergebnis einer Regel oder Analyse, verständlich formuliert."""
+    """Verständlich formulierter Befund aus einer Regel oder Analyse.
+
+    ``regel_id`` ordnet den Befund einer Regel zu, ``bewertung`` gibt seine
+    Schwere an und ``text`` beschreibt die Beobachtung für den Anwender.
+    """
 
     regel_id: str
     bewertung: Bewertung

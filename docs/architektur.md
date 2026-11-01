@@ -25,7 +25,7 @@
 | `analyse/*` (weitere) | analyst | offen |
 | `speicher/` | datensammler | offen |
 | `alarm/` | alarm | offen |
-| `bericht/` | analyst | offen |
+| `bericht/tagesbericht.py` | analyst | vorhanden |
 | `dashboard.py` | Streamlit-Dashboard | vorhanden (Simulation) |
 
 ## Datenformat

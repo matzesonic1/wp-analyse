@@ -1,1 +1,1 @@
-"""WP-Analyse: Analyse und Monitoring einer Wärmepumpe."""
+"""Werkzeuge zum Sammeln, Analysieren und Überwachen von Wärmepumpendaten."""
