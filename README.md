@@ -14,8 +14,11 @@ pip install -e ".[dev]"
 python -m wpanalyse.demo          # erzeugt Testdaten und zeigt erste Kennzahlen
 pytest
 ```
-Die App läuft zuerst mit **simulierten Daten**. Die echte Wärmepumpe wird später über einen Adapter angebunden
-(Home Assistant, Hersteller-API oder Modbus) – siehe `docs/backlog.md`, Issue 2.
+Die App läuft zuerst mit **simulierten Daten**. Für echte Messwerte gibt es
+einen Home-Assistant-Adapter für Novelan/Luxtronik; Voraussetzungen und Ablauf
+stehen in [`docs/novelan-ladv9-adapter.md`](docs/novelan-ladv9-adapter.md).
+Direkte Hersteller-API- und Modbus-Adapter sowie ein dauerhaft automatischer
+Erfassungsprozess sind noch nicht implementiert.
 
 ## Aufbau
 | Ordner | Inhalt |
