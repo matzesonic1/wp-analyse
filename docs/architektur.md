@@ -11,7 +11,7 @@
  analyse/       → Kennzahlen + Anomalie-Regeln  (reine Funktionen)
         ▼
  alarm/         → entscheidet & versendet Meldungen (Telegram, E-Mail, ntfy)
- bericht/       → Tages-/Wochenbericht, später Dashboard (Streamlit oder Grafana)
+ dashboard.py   → Streamlit-Dashboard für Messwertverläufe und Kennzahlen
 ```
 
 ## Module
@@ -26,6 +26,7 @@
 | `speicher/` | datensammler | offen |
 | `alarm/` | alarm | offen |
 | `bericht/tagesbericht.py` | analyst | vorhanden |
+| `dashboard.py` | Streamlit-Dashboard | vorhanden (Simulation) |
 
 ## Datenformat
 Ein pandas-DataFrame mit `DatetimeIndex` (UTC), eine Spalte je Feld aus `docs/fachwissen.md`.
