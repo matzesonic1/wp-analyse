@@ -20,6 +20,14 @@ stehen in [`docs/novelan-ladv9-adapter.md`](docs/novelan-ladv9-adapter.md).
 Direkte Hersteller-API- und Modbus-Adapter sowie ein dauerhaft automatischer
 Erfassungsprozess sind noch nicht implementiert.
 
+## Dashboard
+```bash
+pip install -e ".[dashboard]"
+streamlit run src/wpanalyse/dashboard.py
+```
+Das Dashboard zeigt simulierte Temperatur- und Leistungsverläufe, Verdichterstarts pro Tag sowie die
+Arbeitszahl in Abhängigkeit von der Außentemperatur.
+
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|
