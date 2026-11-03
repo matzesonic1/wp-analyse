@@ -41,3 +41,58 @@ class Config:
 
     # Datenqualität (A7)
     max_datenluecke_min: int = 30
+
+
+# Zuordnung Projektfeld -> Luxtronik-Calculation (nur lesend abgefragt)
+LUXTRONIK_FELDER: dict[str, str] = {
+    "aussen_c": "ID_WEB_Temperatur_TA",
+    "vorlauf_c": "ID_WEB_Temperatur_TVL",
+    "ruecklauf_c": "ID_WEB_Temperatur_TRL",
+    "ruecklauf_soll_c": "ID_WEB_Sollwert_TRL_HZ",
+    "warmwasser_c": "ID_WEB_Temperatur_TBW",
+    "heissgas_c": "ID_WEB_Temperatur_THG",
+    "quelle_ein_c": "ID_WEB_Temperatur_TWE",
+    "quelle_aus_c": "ID_WEB_Temperatur_TWA",
+    "waerme_w": "Heat_Output",
+    "verdichter_laufzeit_s": "ID_WEB_Time_WPein_akt",
+    "verdichter_starts_zaehler": "ID_WEB_Zaehler_BetrZeitImpVD1",
+    "verdichter_betriebszeit_s": "ID_WEB_Zaehler_BetrZeitVD1",
+    "heizstab1_laufzeit_s": "ID_WEB_Time_ZWE1_akt",
+    "heizstab2_laufzeit_s": "ID_WEB_Time_ZWE2_akt",
+    "abtauung_zeit_s": "ID_WEB_Time_AbtIn",
+    "betriebsart_roh": "ID_WEB_WP_BZ_akt",
+}
+
+
+@dataclass
+class LuxtronikConfig:
+    """Verbindungs- und Abfrageeinstellungen für den Luxtronik-Regler.
+
+    Der Host wird aus der Umgebungsvariable ``LUXTRONIK_HOST`` gelesen, damit keine
+    Adressen im Code stehen.
+    """
+
+    host: str = ""
+    port: int = 8889
+    abfrage_intervall_s: float = 60.0
+    min_intervall_s: float = 60.0
+    # Zuordnung roher Betriebsart-Texte des Reglers zu Projekt-Betriebsarten
+    betriebsart_zuordnung: dict[str, str] = field(
+        default_factory=lambda: {
+            "heating": "heizen",
+            "hot water": "warmwasser",
+            "defrost": "abtauen",
+            "no request": "aus",
+            "cooling": "kuehlen",
+        }
+    )
+
+    @classmethod
+    def aus_umgebung(cls) -> "LuxtronikConfig":
+        """Erzeugt die Konfiguration aus ``LUXTRONIK_HOST`` und ``LUXTRONIK_PORT``."""
+        import os
+
+        return cls(
+            host=os.environ.get("LUXTRONIK_HOST", ""),
+            port=int(os.environ.get("LUXTRONIK_PORT", "8889")),
+        )
