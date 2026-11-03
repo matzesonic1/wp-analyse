@@ -48,7 +48,25 @@ class LuxtronikAdapter(DatenAdapter):
         for feld, luxtronik_name in self._felder.items():
             eintrag = client.calculations.get(luxtronik_name)
             zeile[feld] = None if eintrag is None else eintrag.value
+        if self._config.alle_calculations_speichern:
+            zeile.update(self._weitere_werte(client, set(self._felder.values())))
         return self._in_projektformat(zeile)
+
+    @staticmethod
+    def _weitere_werte(client: Any, bereits: set[str]) -> dict[str, Any]:
+        """Liefert alle übrigen benannten Calculations als Spalten ``lux_<name>``.
+
+        Unbenannte Felder (``Unknown_*``) und Texte werden übersprungen.
+        """
+        alle = getattr(getattr(client, "calculations", None), "calculations", None) or {}
+        werte: dict[str, Any] = {}
+        for eintrag in alle.values():
+            name = str(eintrag.name)
+            if name in bereits or name.startswith("Unknown_"):
+                continue
+            if isinstance(eintrag.value, bool | int | float):
+                werte[f"lux_{name}"] = eintrag.value
+        return werte
 
     def _in_projektformat(self, roh: dict[str, Any]) -> pd.DataFrame:
         """Leitet abgeleitete Felder ab und baut den DataFrame mit UTC-Index."""

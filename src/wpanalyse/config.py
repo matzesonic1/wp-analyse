@@ -1,6 +1,7 @@
 """Zentrale, objektspezifisch anpassbare Schwellwerte für die Analysen."""
 
 from dataclasses import dataclass, field
+from datetime import date
 
 
 @dataclass
@@ -43,6 +44,27 @@ class Config:
     max_datenluecke_min: int = 30
 
 
+@dataclass
+class VerdichterConfig:
+    """Schwellwerte und Zählerbasis für die Verdichter-Bewertung.
+
+    Die Grenzwerte sind Richtwerte und KEINE geprüften Herstellerangaben. Sie müssen
+    mit dem Datenblatt des verbauten Verdichters abgeglichen werden.
+    """
+
+    # Frühester möglicher Tauschzeitpunkt (Dezember 2025); dient als Obergrenze für die Plausibilität
+    tausch_fruehestens: date = date(2025, 12, 1)
+    # Zählerstände zum Tauschzeitpunkt; None = unbekannt (Zähler wurden evtl. nicht zurückgesetzt)
+    basis_starts: int | None = None
+    basis_betriebszeit_s: int | None = None
+    # Starts pro Stunde (gleitend über 60 Minuten): Hinweis und Warnung
+    hinweis_starts_pro_stunde: int = 4
+    max_starts_pro_stunde: int = 6
+    # Mittlere Laufzeit je Start (Zähler): darunter Hinweis bzw. Warnung
+    min_mittlere_laufzeit_min: float = 10.0
+    ziel_mittlere_laufzeit_min: float = 30.0
+
+
 # Zuordnung Projektfeld -> Luxtronik-Calculation (nur lesend abgefragt)
 LUXTRONIK_FELDER: dict[str, str] = {
     "aussen_c": "ID_WEB_Temperatur_TA",
@@ -76,6 +98,8 @@ class LuxtronikConfig:
     port: int = 8889
     abfrage_intervall_s: float = 60.0
     min_intervall_s: float = 60.0
+    # Alle weiteren benannten Regler-Werte als Spalten ``lux_<name>`` mitspeichern
+    alle_calculations_speichern: bool = True
     # Zuordnung roher Betriebsart-Texte des Reglers zu Projekt-Betriebsarten
     betriebsart_zuordnung: dict[str, str] = field(
         default_factory=lambda: {

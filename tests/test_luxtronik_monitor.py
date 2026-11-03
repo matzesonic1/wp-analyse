@@ -27,8 +27,30 @@ class FalscherClient:
     def __init__(self, werte):
         """Baut das Objekt ``calculations`` mit ``get`` nach."""
         self.calculations = SimpleNamespace(
-            get=lambda name: SimpleNamespace(value=werte[name]) if name in werte else None
+            get=lambda name: SimpleNamespace(value=werte[name]) if name in werte else None,
+            calculations={
+                i: SimpleNamespace(name=name, value=wert) for i, (name, wert) in enumerate(werte.items())
+            }
+            | {
+                900: SimpleNamespace(name="Unknown_Calculation_900", value=5),
+                901: SimpleNamespace(name="ID_WEB_Freq_VD", value=1742),
+                902: SimpleNamespace(name="ID_WEB_Text", value="abc"),
+            },
         )
+
+
+def test_weitere_werte_als_lux_spalten():
+    df = _adapter().aktuell()
+    assert df["lux_ID_WEB_Freq_VD"].iloc[0] == 1742
+    assert "lux_ID_WEB_Text" not in df.columns
+    assert "lux_Unknown_Calculation_900" not in df.columns
+    assert "lux_ID_WEB_Temperatur_TVL" not in df.columns
+
+
+def test_weitere_werte_abschaltbar():
+    config = LuxtronikConfig(host="x", alle_calculations_speichern=False)
+    df = LuxtronikAdapter(config, lambda h, p: FalscherClient(WERTE)).aktuell()
+    assert not any(spalte.startswith("lux_") for spalte in df.columns)
 
 
 def _adapter(werte=WERTE):

@@ -24,7 +24,9 @@ def main() -> None:
 
     with st.expander("Abgefragte Felder"):
         st.table(
-            pd.DataFrame({"Projektfeld": list(LUXTRONIK_FELDER), "Luxtronik-ID": list(LUXTRONIK_FELDER.values())})
+            pd.DataFrame(
+                {"Projektfeld": list(LUXTRONIK_FELDER), "Luxtronik-ID": list(LUXTRONIK_FELDER.values())}
+            )
         )
 
     # Sperre gegen zu häufiges Abfragen (Schonung des Reglers)

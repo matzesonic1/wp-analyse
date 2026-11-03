@@ -1,7 +1,35 @@
 import pandas as pd
 
-from wpanalyse.dashboard import berechne_az_nach_aussentemperatur, berechne_starts_pro_tag
+from wpanalyse.dashboard import (
+    berechne_az_nach_aussentemperatur,
+    berechne_starts_pro_tag,
+    bereite_auswahl_vor,
+    numerische_spalten,
+)
 from wpanalyse.simulation import simuliere
+
+
+def test_freie_auswahl_erkennt_zahlen_und_bool():
+    index = pd.date_range("2026-01-10", periods=2, freq="min", tz="UTC")
+    df = pd.DataFrame(
+        {"a_c": [1.0, 2.0], "an": [True, False], "text": ["x", "y"], "leer": [None, None]}, index=index
+    )
+
+    assert numerische_spalten(df) == ["a_c", "an"]
+    daten = bereite_auswahl_vor(df, ["a_c", "an"])
+    assert daten["an"].tolist() == [1.0, 0.0]
+
+
+def test_starts_aus_regler_zaehler():
+    index = pd.date_range("2026-01-10 23:58", periods=4, freq="min", tz="UTC")
+    df = pd.DataFrame({"verdichter_starts_zaehler": [100, 101, 101, 102]}, index=index)
+
+    starts = berechne_starts_pro_tag(df)
+
+    assert starts.to_dict() == {
+        pd.Timestamp("2026-01-10", tz="UTC"): 1,
+        pd.Timestamp("2026-01-11", tz="UTC"): 1,
+    }
 
 
 def test_starts_werden_pro_utc_tag_gezaehlt():
