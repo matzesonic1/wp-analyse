@@ -14,19 +14,29 @@ pip install -e ".[dev]"
 python -m wpanalyse.demo          # erzeugt Testdaten und zeigt erste Kennzahlen
 pytest
 ```
-Die App läuft zuerst mit **simulierten Daten**. Für echte Messwerte gibt es
-einen Home-Assistant-Adapter für Novelan/Luxtronik; Voraussetzungen und Ablauf
-stehen in [`docs/novelan-ladv9-adapter.md`](docs/novelan-ladv9-adapter.md).
-Direkte Hersteller-API- und Modbus-Adapter sowie ein dauerhaft automatischer
-Erfassungsprozess sind noch nicht implementiert.
+Die App läuft mit **simulierten Daten** oder mit **echten Messwerten** direkt vom
+Luxtronik-Regler (Novelan/Alpha Innotec, nur lesend, alle 60 s). Details:
+[`docs/luxtronik-anbindung.md`](docs/luxtronik-anbindung.md). Alternativ gibt es einen
+Home-Assistant-Adapter: [`docs/novelan-ladv9-adapter.md`](docs/novelan-ladv9-adapter.md).
+Modbus und eine Stromzähler-Quelle (für die Arbeitszahl) sind noch nicht implementiert.
+
+## Echtbetrieb
+```powershell
+pip install -e ".[luxtronik,dashboard]"
+$env:LUXTRONIK_HOST = "192.168.178.116"
+python -m wpanalyse.monitor                          # Dauerabfrage alle 60 s nach data/wp.sqlite
+python -m streamlit run src\wpanalyse\testseite.py   # manuelle Einzelabfrage
+```
 
 ## Dashboard
 ```bash
 pip install -e ".[dashboard]"
-streamlit run src/wpanalyse/dashboard.py
+python -m streamlit run src/wpanalyse/dashboard.py
 ```
-Das Dashboard zeigt simulierte Temperatur- und Leistungsverläufe, Verdichterstarts pro Tag sowie die
-Arbeitszahl in Abhängigkeit von der Außentemperatur.
+Das Dashboard hat zwei Datenquellen (Seitenleiste): **Live-Betrieb** (Abfrage alle 60 s) und
+**Simulation**. Es zeigt aktuelle Werte, Temperatur-, Leistungs- und Laufzeitverläufe,
+Verdichterstarts pro Tag und gesamt, die Bewertung von Anläufen zur Betriebszeit, die
+Arbeitszahl über der Außentemperatur sowie eine freie Auswahl aller gespeicherten Messwerte.
 
 ## Aufbau
 | Ordner | Inhalt |
