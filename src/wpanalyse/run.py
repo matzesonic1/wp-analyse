@@ -17,6 +17,7 @@ from .alarm import AlarmManager
 from .alarm.melder import NtfyMelder
 from .config import Config
 from .erfassung import sammle_und_speichere
+from .log_setup import konfiguriere_logging
 from .monitoring import pruefe_und_melde
 from .speicher.sqlite import SQLiteSpeicher
 from .tageslauf import erzeuge_tagesbericht
@@ -156,7 +157,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Zielordner für Tagesberichte",
     )
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    konfiguriere_logging()
+    log.info("Dauerbetrieb gestartet")
 
     try:
         adapter = NovelanLadv9Adapter()

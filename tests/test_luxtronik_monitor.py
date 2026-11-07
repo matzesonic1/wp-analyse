@@ -1,10 +1,12 @@
 """Tests für LuxtronikAdapter und Monitor mit einem gefälschten Regler."""
 
 from types import SimpleNamespace
+import sys
 
 import pandas as pd
 import pytest
 
+from wpanalyse import monitor
 from wpanalyse.adapters.luxtronik import LuxtronikAdapter
 from wpanalyse.config import LUXTRONIK_FELDER, LuxtronikConfig
 from wpanalyse.monitor import Monitor
@@ -132,3 +134,15 @@ def test_monitor_behandelt_leere_messreihe_ohne_exception(caplog):
 
     assert gespeichert.empty
     assert "Keine Messwerte empfangen" in caplog.text
+
+
+def test_monitor_cli_meldet_start_erfolg_und_stop(caplog, monkeypatch, tmp_path):
+    """Der Einmalbetrieb protokolliert Start, erfolgreiche Abfrage und Stop."""
+    monkeypatch.setattr("wpanalyse.adapters.luxtronik.LuxtronikAdapter", lambda _config: _adapter())
+    monkeypatch.setattr(sys, "argv", ["monitor", "--db", str(tmp_path / "messwerte.sqlite"), "--einmal"])
+
+    monitor.main()
+
+    assert "Monitoring gestartet" in caplog.text
+    assert "Messung gespeichert" in caplog.text
+    assert "Monitoring beendet" in caplog.text

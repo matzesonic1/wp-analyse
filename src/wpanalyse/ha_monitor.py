@@ -9,42 +9,11 @@ import threading
 from collections.abc import Sequence
 
 from wpanalyse.adapters.novelan_ladv9 import NovelanLadv9Adapter
+from wpanalyse.log_setup import konfiguriere_logging
 from wpanalyse.monitor import Monitor
 from wpanalyse.speicher.sqlite import SQLiteSpeicher
 
 log = logging.getLogger("wpanalyse.ha_monitor")
-_monitor_log = logging.getLogger("wpanalyse.monitor")
-
-
-class _GeheimnisFilter(logging.Filter):
-    """Entfernt Zugangstoken und Fehlerdetails aus Monitoring-Logs."""
-
-    def __init__(self) -> None:
-        """Erstellt einen Filter ohne konfiguriertes Geheimnis."""
-        super().__init__()
-        self._geheimnis = ""
-
-    def setze_geheimnis(self, geheimnis: str) -> None:
-        """Aktualisiert das zu verbergende Token."""
-        self._geheimnis = geheimnis
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Redigiert Token und Tracebacks vor der Ausgabe."""
-        try:
-            nachricht = record.getMessage()
-        except (TypeError, ValueError):
-            nachricht = "Monitoring-Log konnte nicht formatiert werden"
-        if self._geheimnis:
-            nachricht = nachricht.replace(self._geheimnis, "[GEHEIM]")
-        record.msg = nachricht
-        record.args = ()
-        record.exc_info = None
-        record.exc_text = None
-        return True
-
-
-_geheimnis_filter = _GeheimnisFilter()
-_monitor_log.addFilter(_geheimnis_filter)
 
 
 def _intervall(wert: str) -> float:
@@ -76,15 +45,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--einmal", action="store_true", help="nur eine Abfrage ausführen")
     args = parser.parse_args(argv)
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    _geheimnis_filter.setze_geheimnis(os.environ.get("HA_TOKEN", ""))
+    konfiguriere_logging()
+    log.info("Home-Assistant-Monitor gestartet")
 
     try:
         adapter = NovelanLadv9Adapter()
         with SQLiteSpeicher(args.db) as speicher:
             monitor = Monitor(adapter, speicher, args.intervall, min_intervall_s=60.0)
             if args.einmal:
-                return 0 if monitor.einmal() else 1
+                ergebnis = 0 if monitor.einmal() else 1
+                log.info("Home-Assistant-Monitor beendet")
+                return ergebnis
 
             stop_event = threading.Event()
             vorherige_handler = {}

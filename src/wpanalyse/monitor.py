@@ -11,6 +11,7 @@ from collections.abc import Callable
 
 from wpanalyse.adapters.base import DatenAdapter
 from wpanalyse.config import LuxtronikConfig
+from wpanalyse.log_setup import konfiguriere_logging
 from wpanalyse.speicher.sqlite import SQLiteSpeicher
 
 log = logging.getLogger("wpanalyse.monitor")
@@ -40,7 +41,7 @@ class Monitor:
                 return False
             self._speicher.speichern(df)
         except Exception:
-            log.exception("Abfrage fehlgeschlagen, nächster Versuch im Intervall")
+            log.error("Abfrage fehlgeschlagen, nächster Versuch im Intervall")
             return False
         log.info("Messung gespeichert: %s", df.index[0].isoformat())
         return True
@@ -69,12 +70,14 @@ def main() -> None:
     parser.add_argument("--einmal", action="store_true", help="nur eine Abfrage")
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    konfiguriere_logging()
+    log.info("Monitoring gestartet")
     config = LuxtronikConfig.aus_umgebung()
     with SQLiteSpeicher(args.db) as speicher:
         monitor = Monitor(LuxtronikAdapter(config), speicher, args.intervall, config.min_intervall_s)
         if args.einmal:
             monitor.einmal()
+            log.info("Monitoring beendet")
             return
         try:
             monitor.laufen()
