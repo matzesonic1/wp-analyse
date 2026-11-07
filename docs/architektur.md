@@ -134,6 +134,31 @@ Schema-Migration wird beim Initialisieren automatisch ausgeführt.
 Der Live-Reglerzugriff über das Streamlit-Dashboard wurde am selben Tag erfolgreich
 geprüft; Dauerbetrieb ist nicht validiert.
 
+## Logging
+
+Alle Prozess-Einstiege (`python -m wpanalyse.run`, `python -m wpanalyse.ha_monitor`,
+`python -m wpanalyse.monitor` und die Supervisor-App) verwenden dasselbe Logging-Konzept:
+
+- Standardstufe ist `INFO`; `DEBUG` wird über `WPANALYSE_LOG_LEVEL=DEBUG` aktiviert.
+  Die Einstellung gilt für den gesamten Prozess und wird am Einstieg konfiguriert,
+  nicht in Analysefunktionen.
+- `INFO` beschreibt reguläre Start-, Abschluss- und Verarbeitungsschritte,
+  `WARNING` behebbare Probleme und `ERROR` fehlgeschlagene Vorgänge. `DEBUG` darf
+  zusätzliche Diagnosen enthalten, aber keine sensiblen Daten.
+- Die Ausgabe geht nach `stdout`, mit Zeitstempel und Log-Stufe. Im Home-Assistant-App-
+  Betrieb werden diese Container-Ausgaben im Supervisor unter den App-Logs angezeigt.
+- Zugangsdaten wie `HA_TOKEN` und vollständige Konfigurationswerte werden nie geloggt.
+  Fehler aus externen Bibliotheken werden nur mit einer sicheren Zusammenfassung
+  protokolliert, insbesondere ohne ungeprüften Fehlertext oder Traceback, der
+  Zugangsdaten enthalten könnte.
+
+Die aktuelle Codebasis setzt an den Einstiegen `INFO` über `logging.basicConfig`;
+`WPANALYSE_LOG_LEVEL` und eine einheitliche Konfigurationsfunktion sind noch nicht
+verdrahtet. Die Log-Ausgabe in `wpanalyse.monitor` protokolliert derzeit außerdem
+Ausnahme-Tracebacks und entspricht damit noch nicht vollständig der obigen Regel.
+Die spätere gemeinsame Konfiguration hat die Schnittstelle
+`konfiguriere_logging(stufe: str | None = None) -> None`.
+
 ## Home-Assistant-App
 
 ```
