@@ -115,7 +115,7 @@ def test_scheduler_laufzeitfehler_werden_weitergegeben(tmp_path):
         scheduler.laufen()
 
 
-def test_main_konfiguriert_scheduler_und_beendet_geordnet(monkeypatch, tmp_path):
+def test_main_konfiguriert_scheduler_und_beendet_geordnet(caplog, monkeypatch, tmp_path):
     """Die CLI übergibt Optionen und behandelt SIGTERM mit restaurierten Handlern."""
     monkeypatch.setenv("HA_URL", "http://ha.test")
     monkeypatch.setenv("HA_TOKEN", "test-token")
@@ -163,6 +163,8 @@ def test_main_konfiguriert_scheduler_und_beendet_geordnet(monkeypatch, tmp_path)
     assert scheduler_werte == {"bericht_ordner": tmp_path / "berichte", "intervall_s": 90.0}
     assert set(handler) == {signal.SIGINT, signal.SIGTERM}
     assert set(zurueckgesetzt) == {signal.SIGINT, signal.SIGTERM}
+    assert "Dauerbetrieb gestartet" in caplog.text
+    assert "Dauerbetrieb geordnet beendet" in caplog.text
 
 
 def test_main_meldet_laufzeitfehler_und_liefert_fehlercode(caplog, monkeypatch):

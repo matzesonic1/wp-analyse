@@ -47,7 +47,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         konfiguriere_logging()
-        log.info("Home-Assistant-Monitor wird gestartet")
+        log.info("Home-Assistant-Monitor gestartet")
         adapter = NovelanLadv9Adapter()
         with SQLiteSpeicher(args.db) as speicher:
             monitor = Monitor(adapter, speicher, args.intervall, min_intervall_s=60.0)

@@ -157,10 +157,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Zielordner für Tagesberichte",
     )
     args = parser.parse_args(argv)
-
     try:
         konfiguriere_logging()
-        log.info("Dauerbetrieb wird gestartet")
+        log.info("Dauerbetrieb gestartet")
         adapter = NovelanLadv9Adapter()
         melder = NtfyMelder() if os.environ.get("NTFY_TOPIC") else _LogMelder()
         bericht_ordner = Path(args.bericht_ordner)

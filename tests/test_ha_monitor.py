@@ -31,7 +31,7 @@ def _env(monkeypatch, token: str = "test-token") -> None:
     monkeypatch.setenv("NOVELAN_ENTITY_AUSSEN_C", "sensor.aussen")
 
 
-def test_main_speichert_einmalige_messung_in_sqlite(tmp_path, monkeypatch):
+def test_main_speichert_einmalige_messung_in_sqlite(caplog, tmp_path, monkeypatch):
     """Der CLI-Einmalmodus schreibt Adapterwerte in den angegebenen Speicher."""
     _env(monkeypatch)
     monkeypatch.setattr(ha_monitor, "NovelanLadv9Adapter", _FakeAdapter)
@@ -44,6 +44,9 @@ def test_main_speichert_einmalige_messung_in_sqlite(tmp_path, monkeypatch):
         messwerte = speicher.lese(datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 1, 3, tzinfo=UTC))
     assert messwerte.loc["2026-01-02T00:00:00Z", "aussen_c"] == 4.5
     assert messwerte.loc["2026-01-02T00:00:00Z", "verdichter_an"]
+    assert "Home-Assistant-Monitor gestartet" in caplog.text
+    assert "Messung gespeichert" in caplog.text
+    assert "Home-Assistant-Monitor beendet" in caplog.text
 
 
 def test_main_begrenzt_pollingintervall_auf_minimum(tmp_path, monkeypatch):

@@ -75,7 +75,7 @@ def main() -> None:
 
     try:
         konfiguriere_logging()
-        log.info("Monitoring wird gestartet")
+        log.info("Monitoring gestartet")
         config = LuxtronikConfig.aus_umgebung()
         with SQLiteSpeicher(args.db) as speicher:
             monitor = Monitor(

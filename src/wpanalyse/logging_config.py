@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import sys
 
 _FORMAT = "%(asctime)s %(levelname)s %(message)s"
 _GEHEIMNIS_NAME = re.compile(
@@ -24,7 +25,8 @@ class _GeheimnisFilter(logging.Filter):
         if record.exc_info:
             nachricht = "Fehlerdetails ausgeblendet"
             record.exc_info = None
-            record.exc_text = None
+        record.exc_text = None
+        record.stack_info = None
 
         geheimnisse = sorted(
             (
@@ -53,9 +55,22 @@ def konfiguriere_logging(stufe: str | None = None) -> None:
     if not isinstance(level, int):
         raise ValueError("Unbekannte Logstufe")  # noqa: TRY004 - Der Logstufenwert ist ungültig.
 
-    logging.basicConfig(level=level, format=_FORMAT)
     root = logging.getLogger()
     root.setLevel(level)
     for handler in root.handlers:
         if _geheimnis_filter not in handler.filters:
             handler.addFilter(_geheimnis_filter)
+    handler = next(
+        (handler for handler in root.handlers if getattr(handler, "_wpanalyse_handler", False)),
+        None,
+    )
+    if handler is None:
+        handler = logging.StreamHandler(sys.stdout)
+        handler._wpanalyse_handler = True
+        root.addHandler(handler)
+    else:
+        handler.setStream(sys.stdout)
+    if _geheimnis_filter not in handler.filters:
+        handler.addFilter(_geheimnis_filter)
+    handler.setFormatter(logging.Formatter(_FORMAT))
+    handler.setLevel(level)
