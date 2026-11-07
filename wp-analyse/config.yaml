@@ -1,5 +1,5 @@
 name: WP-Analyse
-version: "0.1.0"
+version: "0.1.1"
 slug: wp_analyse
 description: Sammelt Home-Assistant-Messwerte einer Wärmepumpe in SQLite.
 url: "https://github.com/matzesonic1/wp-analyse/tree/main/wp-analyse"
