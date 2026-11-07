@@ -53,12 +53,12 @@ keine passenden Messwerte vorliegen, zeigen einen erklärenden Hinweis oder entf
 Die Sidebar wählt die Datenquelle (Live-Betrieb oder Simulation). Im Live-Betrieb
 enthält sie außerdem Luxtronik-Host und -Port sowie den dargestellten Zeitraum
 (1–72 Stunden, Standard 6 Stunden); das konfigurierte Abfrageintervall wird im
-Hauptbereich angezeigt. Live-Abfragen erfolgen nur lesend und höchstens im
-konfigurierten Intervall. In der Simulation zeigt das Hauptfeld den Hinweis
+Hauptbereich angezeigt. Live-Abfragen erfolgen nur lesend; die Intervallprüfung und
+ihre Grenzen bei gleichzeitigen Prozessen sind unten beschrieben. In der Simulation zeigt das Hauptfeld den Hinweis
 „Simulierte Messdaten“ und verwendet simulierte Daten statt Regler und SQLite.
 
-Die Logging-Steuerung gehört ebenfalls in die Sidebar und ist getrennt von der
-Datenquellenauswahl:
+Die vorhandene Logging-Steuerung liegt ebenfalls in der Sidebar und ist von der
+Datenquellenauswahl getrennt:
 
 - „Anwendungslogs“ ist ein Ein/Aus-Schalter, kein Logstufenwert. Standardmäßig ist
   er eingeschaltet. Daneben wählt eine Logstufen-Auswahl `DEBUG`, `INFO`, `WARNING`
@@ -71,8 +71,10 @@ Datenquellenauswahl:
 - Die GUI-Einstellung wirkt auf den gesamten Dashboard-Prozess und damit auf alle
   Browser-Sitzungen dieses Prozesses, nicht nur auf den Browser, der sie geändert hat.
   Sie gilt bis zur nächsten Änderung oder zum Neustart des Prozesses und wird nicht
-  dauerhaft gespeichert. Beim Start initialisiert `WPANALYSE_LOG_LEVEL` die Stufe
-  (Standard `INFO`); eine Änderung in der GUI hat bis zum Neustart Vorrang.
+  dauerhaft gespeichert. Bei der ersten Dashboard-Ausführung im Prozess initialisiert
+  `WPANALYSE_LOG_LEVEL` die Stufe (Standard `INFO`, ungültiger Wert: `INFO`); eine
+  Änderung in der GUI hat bis zum Neustart Vorrang. Andere Sitzungen übernehmen
+  den Prozesszustand bei ihrem nächsten vollständigen Dashboard-Rerun.
 - Betroffen sind die Anwendungs-Logmeldungen des Dashboard-Prozesses, einschließlich
   der von ihm aufgerufenen WP-Analyse-Module. Sie erscheinen auf `stdout` und damit
   je nach Startart im Terminal beziehungsweise in den Supervisor-App-Logs. Sie werden
@@ -118,35 +120,103 @@ dass Ruff und pytest erfolgreich waren.
 
 ## Protokollierung
 
-Für die Prozess-Einstiege gilt ein einheitliches Logging mit `INFO` als Standardstufe.
-`WPANALYSE_LOG_LEVEL` setzt die Mindeststufe; `DEBUG` dient der gezielten Fehlersuche.
-Die Ausgabe erfolgt nach `stdout`, damit sie in Terminals und von Prozess-/
-Container-Managern gesammelt werden kann. Die gemeinsame Funktion lautet
-`konfiguriere_logging(stufe: str | None = None) -> None` und ist in
-`wpanalyse.logging_config` implementiert.
+### Implementierter Stand
 
-Das Konzept ist für `python -m wpanalyse.monitor`, `python -m wpanalyse.ha_monitor`,
-`python -m wpanalyse.run` und den Supervisor-Einstieg `wp-analyse/run.py` umgesetzt.
-Die Supervisor-App übergibt ihre konfigurierbare Logstufe über
-`WPANALYSE_LOG_LEVEL`. Bei einem lokalen Start aus VS Code ist `stdout` im integrierten
-Terminal sichtbar; der VS-Code-Debugger kann dafür auf `integratedTerminal`
-konfiguriert werden und `WPANALYSE_LOG_LEVEL` über seine Umgebungsvariablen setzen.
+Für das Dashboard verwaltet `wpanalyse.logging_config` die Einstellungen unter
+einer Sperre. Die Konfiguration verwendet den Logger-Namensraum `wpanalyse` mit
+einem wiederverwendeten `stdout`-Handler und ohne Propagation zum Root-Logger. Die
+anfängliche Stufe stammt aus
+`WPANALYSE_LOG_LEVEL` (Standard `INFO`; im Dashboard wird ein ungültiger Wert auf
+`INFO` zurückgesetzt). Die Sidebar kann Anwendungslogs ein- und ausschalten sowie
+`DEBUG`, `INFO`, `WARNING` oder `ERROR` wählen. „Aus“ setzt die Mindeststufe auf
+`ERROR`. Das sind prozessweite Einstellungen, keine dauerhafte Speicherung.
+`monitor.main()` ruft dieselbe Konfigurationsfunktion ohne Logger-Namensraum auf;
+damit konfiguriert dieser CLI-Einstieg den Root-Logger. Der Helfer verwendet
+standardmäßig `WPANALYSE_LOG_LEVEL` oder `INFO`.
 
-Die oben beschriebene GUI-Steuerung ist das Zielkonzept für das Streamlit-Dashboard;
-sie ist im aktuellen Dashboard noch nicht vorhanden. Dessen Sidebar enthält derzeit
-Datenquelle, Live-Host, Live-Port und Zeitraum. Änderungen an der GUI-Steuerung dürfen
-nicht die Einstellungen anderer Prozesse verändern; innerhalb eines Dashboard-Prozesses
-ist die Einstellung ausdrücklich prozessweit.
+Für `DEBUG` wird ein eigenes Format verwendet: Neben Zeit und Stufe enthält es
+`pid` als numerische Prozess-ID sowie `quelle` aus Loggername und aufrufendem
+Funktionsnamen. Die Diagnose-Helfer setzen `stacklevel`, damit `quelle` den
+aufrufenden Diagnoseort statt des Hilfsfunktionsnamens bezeichnet. Das Format für
+`INFO`, `WARNING` und `ERROR` bleibt unverändert. Diagnosewerte wie Intervall,
+Alter, Grenzwert, Zeitraum, Zeilenanzahl, Dauer sowie Ergebnis und Kategorie sind
+numerische Werte oder feste Bezeichner. Hosts, IP-Adressen, Ports, Dateipfade,
+Secrets und Messwerte gehören nicht zu den ausgegebenen Diagnosefeldern.
 
-`INFO` beschreibt reguläre Start-, Abschluss- und Verarbeitungsschritte, `WARNING`
-behebbare Probleme und `ERROR` fehlgeschlagene Vorgänge. Fehlerlogs bleiben auch bei
-ausgeschalteten Anwendungslogs aktiv. Sie enthalten nur eine sichere Zusammenfassung:
-ungeprüfter externer Fehlertext, Exception-Details und Tracebacks werden nicht
-ausgegeben. Das Dashboard kann einen Fehler zusätzlich nutzerverständlich in der
-Oberfläche anzeigen; diese Anzeige ist unabhängig von der Logstufe. Zugangsdaten
-(insbesondere `HA_TOKEN`), vollständige Konfigurationswerte und Rohantworten gehören
-nie in Logs. Redigierung ist zusätzliche Absicherung und ersetzt nicht, sensible
-Inhalte gar nicht erst zu protokollieren.
+`dashboard.main()` ruft `initialisiere_dashboard_logging()` auf. Diese Funktion
+initialisiert die Dashboard-Einstellungen und versucht bei ihrem ersten Aufruf im
+Prozess einmalig `Dashboard initialisiert` auf `INFO` auszugeben; die Meldung kann
+durch die aktuelle Logstufe unterdrückt werden und wird später nicht nachgeholt.
+Sie bezeichnet diesen Aufruf, nicht den Start eines Servers oder Betriebssystems-
+Prozesses.
+
+`Monitor.einmal()` protokolliert Abfragebeginn und -ende auf `DEBUG`; die Dauer wird
+mit `time.monotonic()` in Millisekunden gemessen. Das Endergebnis ist `erfolg`,
+`leer` oder `fehler`. Adapterfehler werden ohne Exception-Text einer festen Kategorie
+zugeordnet (`timeout`, `verbindung`, `datenformat` oder `unbekannt`) und als
+`ERROR`-Diagnose protokolliert. Leere Messungen ergeben eine `WARNING`-Diagnose.
+Beim Speichern protokolliert der Monitor auf `DEBUG` Erfolg mit Zeilenzahl und Dauer
+oder einen Fehler; Speicherfehler werden als `datenbank`-Zustand gemeldet. Eine
+erfolgreiche Speicherung behält die bestehende `INFO`-Meldung mit Messzeitpunkt.
+
+Im Dashboard protokolliert `frage_regler_ab` die Intervallentscheidung: Bei einer
+jüngsten gespeicherten Messung mit Alter kleiner als `intervall_s - 5` Sekunden
+wird übersprungen; sonst wird `Monitor.einmal()` aufgerufen. Ist keine Messung
+da, wird die Entscheidung `keine_messung` protokolliert. Die Prüfung ist keine
+atomare Sperre zwischen Prozessen. Öffnen und Lesen der SQLite-Datenbank werden
+mit Vorgang, Ergebnis und Dauer auf `DEBUG` protokolliert; beim Lesen kommt bei
+Erfolg die Zeilenzahl hinzu. Öffnungs- und Lesefehler erzeugen eine gedrosselte
+`ERROR`-Diagnose und werden weitergeworfen.
+
+`diagnose_gedrosselt` serialisiert ihren Statuszugriff mit einer Sperre. Für ein
+Ereignis werden Zustandswechsel sofort protokolliert; Wiederholungen desselben
+Zustands werden bis zur 60-Sekunden-Grenze gezählt und dann zusammengefasst.
+`diagnose_wiederhergestellt` beendet den gespeicherten Zustand und protokolliert
+eine Wiederherstellung. Es gibt keine Garantie für Abfrageausschluss oder einen
+bestimmten Streamlit-Rerun-/Fragment-Lebenszyklus.
+
+Der Filter in `logging_config.py` entfernt Werte aus Umgebungsvariablen, deren Namen
+auf bekannte Geheimnisbegriffe passen, und unterdrückt Exception- und Stack-Details.
+Das ist keine vollständige Datenschutz- oder Redaktionsgarantie: Die Tests prüfen
+nur ausgewählte künstliche Geheimnisse, IP-/Host-Texte und Tracebacks in konkreten
+Diagnosepfaden. Insbesondere belegt das keine Filterung beliebiger Fremdlogs,
+Messwerte oder unbekannter Geheimnisse.
+
+### Abdeckung in `tests/test_debug_diagnose.py`
+
+Die Tests verwenden Fake-Adapter und -Speicher, synthetische DataFrames und
+`caplog`; sie führen keinen realen Regler- oder SQLite-Zugriff aus. Abgedeckt sind:
+
+- Erfolgreiche Monitor-Abfrage mit `DEBUG`-Beginn/-Ende und erfolgreichem
+  Speichervorgang, bestehende `INFO`-Erfolgsmeldung sowie das Fehlen dieser
+  Debug-Ereignisse bei `INFO`.
+- Adapterfehler der vier Kategorien mit Prüfungen auf Exception-Text, Test-IP und
+  Traceback; außerdem leere Messung und Speicherfehler.
+- Drosselung, Zusammenfassung, Zustandswechsel und Wiederherstellung mit einer
+  kontrollierten monotonen Uhr.
+- Dreimalige Dashboard-Intervallprüfung mit Überspringen und ohne Protokollierung
+  des übergebenen Test-Hosts; Fehler beim Lesen mit Diagnose und erneutem Werfen.
+- Zehn parallele Aufrufe der Initialisierungsfunktion: einmalige Meldung und genau
+  ein markierter Dashboard-Handler.
+
+Die gezielte Validierung umfasste 48 Tests; Tests und Ruff bestanden.
+Diese Tests belegen nicht den vollständigen Streamlit-Lebenszyklus, echte
+Dashboard-Reruns/Fragmente oder getrennte Prozesse. Offen sind insbesondere Tests
+für den tatsächlichen Dashboard-Start, alle GUI-Stufen und deren Prozesswirkung,
+Abfragepfade mit keiner/veralteter Messung, DB-Öffnungsfehler und erfolgreiche
+Datenbanklesevorgänge. Auch die Dauerwerte werden nicht mit einer Fake-Uhr
+abgenommen; die Drosselung verwendet zwar eine kontrollierte Uhr, aber keine
+vollständige Prüfung aller Zusammenfassungsfälle ist damit verbunden. Die
+Datenschutzprüfungen sind fallbezogen und keine umfassende Allowlist- oder
+Geheimnisfreiheit-Abnahme.
+
+### Bedienung
+
+Das Dashboard kann mit `python -m streamlit run src\wpanalyse\dashboard.py`
+gestartet werden. Anwendungslogs erscheinen im `stdout` des Dashboard-Prozesses;
+`DEBUG` schaltet die beschriebenen Diagnoseereignisse frei. Die Sidebar-Einstellung
+wirkt prozessweit. Die Intervallprüfung kann eine Reglerabfrage überspringen, wenn
+die letzte gespeicherte Messung noch innerhalb der Grenze liegt.
 
 ## Live-Datenfluss
 ```
@@ -155,7 +225,8 @@ Inhalte gar nicht erst zu protokollieren.
  Monitor (≥ 60 s) ──► SQLiteSpeicher (data/wp.sqlite) ──► dashboard.py / analyse/
 ```
 Der Regler hat keine Historie; Daten entstehen nur, solange Monitor oder Dashboard laufen.
-Das Dashboard fragt nur ab, wenn die letzte Messung älter als das Intervall ist.
+Das Dashboard verwendet die oben beschriebene Intervallprüfung anhand der letzten
+Messung; sie garantiert bei parallelen Prozessen keine gegenseitige Ausschließung.
 Siehe [`luxtronik-anbindung.md`](luxtronik-anbindung.md).
 
 ## Integrierter Dauerbetrieb

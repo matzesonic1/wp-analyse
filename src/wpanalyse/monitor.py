@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from wpanalyse.adapters.base import DatenAdapter
 from wpanalyse.config import LuxtronikConfig
-from wpanalyse.logging_config import konfiguriere_logging
+from wpanalyse.logging_config import diagnose_gedrosselt, diagnose_wiederhergestellt, konfiguriere_logging
 from wpanalyse.speicher.sqlite import SQLiteSpeicher
 
 log = logging.getLogger("wpanalyse.monitor")
@@ -34,20 +34,42 @@ class Monitor:
 
     def einmal(self) -> bool:
         """Fragt einmal ab und speichert; Fehler werden geloggt und nicht geworfen."""
+        start = time.monotonic()
+        log.debug("wp_abfrage beginn intervall_s=%.0f", self.intervall_s)
+        ergebnis = "fehler"
         try:
-            df = self._adapter.aktuell()
-            if df.empty:
-                log.warning("Keine Messwerte empfangen, nächster Versuch im Intervall")
+            try:
+                df = self._adapter.aktuell()
+            except Exception as exc:  # noqa: BLE001 - Fremdadapter melden unterschiedliche Fehler.
+                if isinstance(exc, TimeoutError):
+                    kategorie = "timeout"
+                elif isinstance(exc, (ConnectionError, OSError)):
+                    kategorie = "verbindung"
+                elif isinstance(exc, (ValueError, TypeError)):
+                    kategorie = "datenformat"
+                else:
+                    kategorie = "unbekannt"
+                diagnose_gedrosselt(log, logging.ERROR, "Abfrage fehlgeschlagen", kategorie)
                 return False
-            self._speicher.speichern(df)
-        except Exception as exc:  # noqa: BLE001 - Adapter und Speicher können unterschiedliche Fehler werfen.
-            log.error(
-                "Abfrage fehlgeschlagen, nächster Versuch im Intervall (%s)",
-                type(exc).__name__,
-            )
-            return False
-        log.info("Messung gespeichert: %s", df.index[0].isoformat())
-        return True
+            if df.empty:
+                ergebnis = "leer"
+                diagnose_gedrosselt(log, logging.WARNING, "Keine Messwerte empfangen", "leer")
+                return False
+            db_start = time.monotonic()
+            try:
+                self._speicher.speichern(df)
+            except Exception:  # noqa: BLE001 - Speicherfehler müssen sichtbar bleiben.
+                log.debug("datenbank vorgang=speichern ergebnis=fehler dauer_ms=%.0f", (time.monotonic() - db_start) * 1000)
+                diagnose_gedrosselt(log, logging.ERROR, "Abfrage fehlgeschlagen", "datenbank")
+                return False
+            log.debug("datenbank vorgang=speichern ergebnis=ok zeilen=%d dauer_ms=%.0f", len(df), (time.monotonic() - db_start) * 1000)
+            ergebnis = "erfolg"
+            diagnose_wiederhergestellt(log, logging.ERROR, "Abfrage fehlgeschlagen")
+            diagnose_wiederhergestellt(log, logging.WARNING, "Keine Messwerte empfangen")
+            log.info("Messung gespeichert: %s", df.index[0].isoformat())
+            return True
+        finally:
+            log.debug("wp_abfrage ende ergebnis=%s dauer_ms=%.0f", ergebnis, (time.monotonic() - start) * 1000)
 
     def laufen(
         self,

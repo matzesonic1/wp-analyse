@@ -1,15 +1,25 @@
 """Streamlit-Dashboard für Wärmepumpen-Messwerte."""
 
+import logging
+import time
+
 import pandas as pd
 
 from wpanalyse.analyse.verdichter import bewerte_verdichter
 from wpanalyse.config import LuxtronikConfig, VerdichterConfig
-from wpanalyse.logging_config import dashboard_logging_einstellungen, setze_dashboard_logging
+from wpanalyse.logging_config import (
+    dashboard_logging_einstellungen,
+    diagnose_gedrosselt,
+    diagnose_wiederhergestellt,
+    initialisiere_dashboard_logging,
+    setze_dashboard_logging,
+)
 from wpanalyse.simulation import simuliere
 from wpanalyse.speicher.sqlite import SQLiteSpeicher
 
 _LOGGING_AKTIV_SCHLUESSEL = "anwendungslogs_aktiv"
 _LOGGING_STUFE_SCHLUESSEL = "anwendungslogs_stufe"
+log = logging.getLogger("wpanalyse.dashboard")
 
 
 def berechne_starts_pro_tag(df: pd.DataFrame) -> pd.Series:
@@ -49,7 +59,19 @@ DB_PFAD = "data/wp.sqlite"
 def lade_live_daten(speicher: SQLiteSpeicher, stunden: int) -> pd.DataFrame:
     """Liest die letzten ``stunden`` Stunden aus der Datenbank."""
     bis = pd.Timestamp.now(tz="UTC") + pd.Timedelta(minutes=1)
-    return speicher.lese(bis - pd.Timedelta(hours=stunden, minutes=1), bis)
+    start = time.monotonic()
+    try:
+        daten = speicher.lese(bis - pd.Timedelta(hours=stunden, minutes=1), bis)
+    except Exception:
+        log.debug("datenbank vorgang=lesen ergebnis=fehler dauer_ms=%.0f", (time.monotonic() - start) * 1000)
+        diagnose_gedrosselt(log, logging.ERROR, "datenbank lesen fehlgeschlagen", "datenbank")
+        raise
+    log.debug(
+        "datenbank vorgang=lesen ergebnis=ok zeilen=%d zeitraum_h=%d dauer_ms=%.0f",
+        len(daten), stunden, (time.monotonic() - start) * 1000,
+    )
+    diagnose_wiederhergestellt(log, logging.ERROR, "datenbank lesen fehlgeschlagen")
+    return daten
 
 
 def frage_regler_ab(speicher: SQLiteSpeicher, host: str, port: int, intervall_s: float) -> str:
@@ -63,8 +85,16 @@ def frage_regler_ab(speicher: SQLiteSpeicher, host: str, port: int, intervall_s:
 
     jetzt = pd.Timestamp.now(tz="UTC")
     letzte = lade_live_daten(speicher, 1)
-    if not letzte.empty and (jetzt - letzte.index[-1]).total_seconds() < intervall_s - 5:
+    alter_s = (jetzt - letzte.index[-1]).total_seconds() if not letzte.empty else None
+    if alter_s is not None and alter_s < intervall_s - 5:
+        diagnose_gedrosselt(
+            log, logging.DEBUG, "intervall entscheidung", "uebersprungen", (alter_s, intervall_s - 5)
+        )
         return f"Letzte Messung {letzte.index[-1].tz_convert('Europe/Berlin'):%H:%M:%S}"
+    diagnose_gedrosselt(
+        log, logging.DEBUG, "intervall entscheidung", "keine_messung" if letzte.empty else "abfrage",
+        None if alter_s is None else (alter_s, intervall_s - 5),
+    )
     adapter = LuxtronikAdapter(LuxtronikConfig(host=host, port=port))
     ok = Monitor(adapter, speicher, intervall_s).einmal()
     return "Abfrage erfolgreich" if ok else "Abfrage fehlgeschlagen (Regler erreichbar?)"
@@ -282,6 +312,7 @@ def main() -> None:
     st.set_page_config(page_title="WP-Analyse", layout="wide")
     st.title("Wärmepumpen-Dashboard")
 
+    initialisiere_dashboard_logging()
     _zeige_logging_steuerung(st)
     quelle = st.sidebar.radio("Datenquelle", ["Live-Betrieb", "Simulation"])
     if quelle == "Simulation":
@@ -297,7 +328,16 @@ def main() -> None:
 
     @st.fragment(run_every=intervall_s)
     def live() -> None:
-        with SQLiteSpeicher(DB_PFAD) as speicher:
+        start = time.monotonic()
+        try:
+            speicher = SQLiteSpeicher(DB_PFAD)
+        except Exception:
+            log.debug("datenbank vorgang=oeffnen ergebnis=fehler dauer_ms=%.0f", (time.monotonic() - start) * 1000)
+            diagnose_gedrosselt(log, logging.ERROR, "datenbank oeffnen fehlgeschlagen", "datenbank")
+            raise
+        log.debug("datenbank vorgang=oeffnen ergebnis=ok dauer_ms=%.0f", (time.monotonic() - start) * 1000)
+        diagnose_wiederhergestellt(log, logging.ERROR, "datenbank oeffnen fehlgeschlagen")
+        with speicher:
             status = frage_regler_ab(speicher, host, int(port), intervall_s)
             df = lade_live_daten(speicher, stunden)
         st.caption(f"Live-Betrieb, Abfrage alle {intervall_s:.0f} s (nur lesend). {status}")

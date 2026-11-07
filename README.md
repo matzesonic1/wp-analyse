@@ -53,6 +53,12 @@ Das Dashboard hat zwei Datenquellen (Seitenleiste): **Live-Betrieb** (Abfrage al
 Verdichterstarts pro Tag und gesamt, die Bewertung von Anläufen zur Betriebszeit, die
 Arbeitszahl über der Außentemperatur sowie eine freie Auswahl aller gespeicherten Messwerte.
 
+Die Sidebar-Option **Anwendungslogs** und die Logstufe `DEBUG` aktivieren Ablaufdiagnosen
+im Terminal des Dashboard-Prozesses. DEBUG-Zeilen enthalten die Prozess-ID (`pid`),
+Logger und Funktion (`quelle`) sowie sichere Diagnosewerte wie Intervall, Anzahl und
+Dauer. Adressen, Zugangsdaten, Dateipfade und Messwerte werden dafür nicht ausgegeben.
+Ein bereits laufendes Dashboard muss nach Codeänderungen neu gestartet werden.
+
 ## Aufbau
 | Ordner | Inhalt |
 |---|---|
