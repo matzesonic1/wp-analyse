@@ -134,14 +134,13 @@ rückwärtskompatiblen Funktionen und PATCH bei rückwärtskompatiblen Fehlerkor
 Jede veröffentlichte Version ist eindeutig und wird nicht wiederverwendet.
 
 Der Build-Workflow liest diese Versionsnummer und veröffentlicht bei passenden
-Pushes nach `main` sowohl das versionierte Image als auch `latest`. Da der Build
-eine bereits vorhandene Versionsnummer überspringt, muss die App-Version vor
-jedem Push erhöht werden, der ein neues App-Image veröffentlichen soll. Ohne
-Versionswechsel kann `latest` neu gebaut werden, während das versionierte Image
-beim bisherigen Stand bleibt. `latest` ist daher nur ein veränderlicher Verweis,
-kein Ersatz für eine neue App-Version. Ein Release-Commit sollte zusätzlich mit
-dem dazu passenden Git-Tag `vMAJOR.MINOR.PATCH` markiert werden; der Workflow
-wird durch den Push nach `main`, nicht durch den Tag ausgelöst.
+Pushes nach `main` sowohl das versionierte Image als auch `latest`. Vor jedem
+Push, der ein neues App-Image veröffentlichen soll, muss die App-Version erhöht
+werden. Der Pflichtcheck bricht ab, wenn der Versions-Tag bereits existiert.
+`latest` ist ein veränderlicher Verweis und kein Ersatz für eine neue
+App-Version. Ein Release-Commit sollte zusätzlich mit dem dazu passenden
+Git-Tag `vMAJOR.MINOR.PATCH` markiert werden; der Workflow wird durch den Push
+nach `main`, nicht durch den Tag ausgelöst.
 
 Der Workflow prüft die Version vor dem Build gegen vorhandene GHCR-Versionstags
 und bricht ab, wenn der Tag schon existiert oder die Registry-Abfrage fehlschlägt.

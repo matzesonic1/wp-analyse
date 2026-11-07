@@ -31,6 +31,7 @@ jobs:
       build_matrix: ${{ steps.matrix.outputs.matrix }}
       image_name: ${{ steps.normalize.outputs.image_name }}
       registry_prefix: ${{ steps.normalize.outputs.registry_prefix }}
+      image: ${{ steps.normalize.outputs.image }}
       version: ${{ steps.normalize.outputs.version }}
       app_name: ${{ steps.normalize.outputs.app_name }}
       app_description: ${{ steps.normalize.outputs.app_description }}
@@ -66,6 +67,7 @@ jobs:
           image="$(jq -r . <<< "${IMAGE}")"
           echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
           echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
           echo "version=$(jq -r . <<< "${VERSION}")" >> "$GITHUB_OUTPUT"
           echo "app_name=$(jq -r . <<< "${APP_NAME}")" >> "$GITHUB_OUTPUT"
           echo "app_description=$(jq -r . <<< "${APP_DESCRIPTION}")" >> "$GITHUB_OUTPUT"
@@ -96,8 +98,10 @@ jobs:
         env:
           APP_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          if [[ ! "${APP_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::App version '${APP_VERSION}' must use MAJOR.MINOR.PATCH."
+          version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+          version_pattern+='\.(0|[1-9][0-9]*)$'
+          if [[ ! "${APP_VERSION}" =~ ${version_pattern} ]]; then
+            echo "::error::App version must use MAJOR.MINOR.PATCH: ${APP_VERSION}"
             exit 1
           fi
 
@@ -108,15 +112,22 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           changed_files="$(git diff --name-only "${BASE_SHA}" "${GITHUB_SHA}")"
-          if ! grep -Eq '^(wp-analyse/|src/wpanalyse/|pyproject\.toml$|README\.md$)' <<< "${changed_files}"; then
-            echo "No app or application source changes; version increase is not required."
+          if ! grep -Eq \
+            '^(wp-analyse/|src/wpanalyse/|pyproject\.toml$|README\.md$)' \
+            <<< "${changed_files}"; then
+            echo "No app files changed; version increase is not required."
             exit 0
           fi
 
           git fetch origin main:refs/remotes/origin/main
-          main_version="$(git show origin/main:wp-analyse/config.yaml | awk '$1 == "version:" {gsub(/"/, "", $2); print $2; exit}')"
-          if [[ ! "${main_version}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::Could not read a valid MAJOR.MINOR.PATCH version from main."
+          main_version="$(
+            git show origin/main:wp-analyse/config.yaml |
+              awk '$1 == "version:" {gsub(/"/, "", $2); print $2; exit}'
+          )"
+          version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+          version_pattern+='\.(0|[1-9][0-9]*)$'
+          if [[ ! "${main_version}" =~ ${version_pattern} ]]; then
+            echo "::error::The version on main must use MAJOR.MINOR.PATCH."
             exit 1
           fi
 
@@ -138,25 +149,38 @@ jobs:
           APP_VERSION: ${{ needs.prepare.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_USER: ${{ github.actor }}
-          IMAGE: ${{ needs.prepare.outputs.registry_prefix }}/${{ needs.prepare.outputs.image_name }}
+          IMAGE: ${{ needs.prepare.outputs.image }}
         run: |
+          registry_path="${IMAGE#ghcr.io/}"
           token_response="$(curl --fail --silent --show-error \
             --user "${GH_USER}:${GH_TOKEN}" \
-            "https://ghcr.io/token?scope=repository:${IMAGE#ghcr.io/}:pull")"
-          registry_token="$(jq -er '.token // .access_token' <<< "${token_response}")"
-          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-            --oauth2-bearer "${registry_token}" \
-            --header "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
-            "https://ghcr.io/v2/${IMAGE#ghcr.io/}/manifests/${APP_VERSION}")" || {
+            "https://ghcr.io/token?scope=repository:${registry_path}:pull")"
+          registry_token="$(
+            jq -er '.token // .access_token' <<< "${token_response}"
+          )"
+          accept="application/vnd.oci.image.index.v1+json"
+          accept+=", application/vnd.docker.distribution.manifest.list.v2+json"
+          accept+=", application/vnd.oci.image.manifest.v1+json"
+          accept+=", application/vnd.docker.distribution.manifest.v2+json"
+          manifest_url="https://ghcr.io/v2/${registry_path}/manifests/${APP_VERSION}"
+          status="$(
+            curl --silent --show-error --output /dev/null \
+              --write-out '%{http_code}' \
+              --oauth2-bearer "${registry_token}" \
+              --header "Accept: ${accept}" \
+              "${manifest_url}"
+          )" || {
               echo "::error::Could not check the GHCR version tag."
               exit 1
             }
 
           if [[ "${status}" == "200" ]]; then
-            echo "::error::GHCR image tag '${IMAGE}:${APP_VERSION}' already exists. Increase version in wp-analyse/config.yaml."
+            echo "::error::GHCR tag '${IMAGE}:${APP_VERSION}' already exists."
+            echo "::error::Increase the version in wp-analyse/config.yaml."
             exit 1
           elif [[ "${status}" != "404" ]]; then
-            echo "::error::GHCR returned HTTP ${status} while checking '${IMAGE}:${APP_VERSION}'."
+            echo "::error::GHCR returned HTTP ${status}."
+            echo "::error::Could not confirm that the version tag is unused."
             exit 1
           fi
 
