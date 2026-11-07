@@ -1,0 +1,129 @@
+name: Build Home Assistant app
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build-app.yaml"
+      - "wp-analyse/**"
+      - "src/wpanalyse/**"
+      - "pyproject.toml"
+      - "README.md"
+  pull_request:
+    paths:
+      - ".github/workflows/build-app.yaml"
+      - "wp-analyse/**"
+      - "src/wpanalyse/**"
+      - "pyproject.toml"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Prepare app build
+    runs-on: ubuntu-latest
+    outputs:
+      architectures: ${{ steps.info.outputs.architectures }}
+      build_matrix: ${{ steps.matrix.outputs.matrix }}
+      image_name: ${{ steps.normalize.outputs.image_name }}
+      registry_prefix: ${{ steps.normalize.outputs.registry_prefix }}
+      version: ${{ steps.info.outputs.version }}
+      app_name: ${{ steps.info.outputs.name }}
+      app_description: ${{ steps.info.outputs.description }}
+      app_url: ${{ steps.info.outputs.url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Read app metadata
+        id: info
+        uses: home-assistant/actions/helpers/info@58bff37c8947f690ace498be413a9b78d6f30f93
+        with:
+          path: ./wp-analyse
+
+      - name: Validate supported architectures
+        run: |
+          configured="$(awk '/^arch:/{in_arch=1; next} in_arch && /^  - /{print $2; next} in_arch{exit}' wp-analyse/config.yaml)"
+          expected="$(printf 'aarch64\namd64')"
+          if [[ "${configured}" != "${expected}" ]]; then
+            echo "::error::Only aarch64 and amd64 are supported by this app build."
+            exit 1
+          fi
+
+      - name: Normalize image metadata
+        id: normalize
+        env:
+          IMAGE: ${{ steps.info.outputs.image }}
+        run: |
+          echo "image_name=${IMAGE##*/}" >> "$GITHUB_OUTPUT"
+          echo "registry_prefix=${IMAGE%/*}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare architecture matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@2026.09.0
+        with:
+          architectures: ${{ steps.info.outputs.architectures }}
+          image-name: ${{ steps.normalize.outputs.image_name }}
+          registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
+
+  build:
+    name: Build ${{ matrix.arch }} image
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.build_matrix) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build app image
+        uses: home-assistant/builder/actions/build-image@2026.09.0
+        with:
+          arch: ${{ matrix.arch }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          context: .
+          file: wp-analyse/Dockerfile
+          image: ${{ matrix.image }}
+          image-tags: |
+            ${{ needs.prepare.outputs.version }}
+            latest
+          labels: |
+            io.hass.type=app
+            io.hass.name=${{ needs.prepare.outputs.app_name }}
+            io.hass.description=${{ needs.prepare.outputs.app_description }}
+          push: ${{ github.event_name != 'pull_request' }}
+          skip-existing: ${{ needs.prepare.outputs.version }}
+          version: ${{ needs.prepare.outputs.version }}
+
+  manifest:
+    name: Publish multi-architecture manifest
+    needs:
+      - prepare
+      - build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      packages: write
+    steps:
+      - name: Publish manifest
+        uses: home-assistant/builder/actions/publish-multi-arch-manifest@2026.09.0
+        with:
+          architectures: ${{ needs.prepare.outputs.architectures }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image-name: ${{ needs.prepare.outputs.image_name }}
+          image-tags: |
+            ${{ needs.prepare.outputs.version }}
+            latest
+          registry-prefix: ${{ needs.prepare.outputs.registry_prefix }}

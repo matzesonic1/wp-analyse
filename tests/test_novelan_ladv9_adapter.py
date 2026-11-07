@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import patch
+from urllib.error import URLError
 from urllib.parse import parse_qs, urlparse
 
 import pandas as pd
@@ -97,3 +98,32 @@ def test_adapter_benoetigt_ha_zugangsdaten(monkeypatch):
     monkeypatch.delenv("HA_TOKEN", raising=False)
     with pytest.raises(ValueError, match="HA_URL und HA_TOKEN"):
         NovelanLadv9Adapter(sensoren={"aussen_c": "sensor.aussen"})
+
+
+def test_anfrage_wiederholt_nach_netwerkfehler_mit_backoff(monkeypatch):
+    """Ein transienter Netzwerkfehler führt zu Wiederholung und danach Erfolg."""
+    antwort = _antwort(
+        [
+            {
+                "entity_id": "sensor.aussen",
+                "state": "4.5",
+                "last_changed": "2026-01-01T00:00:00+00:00",
+            }
+        ]
+    )
+    antworten = iter([URLError("offline"), antwort])
+    schlafzeiten = []
+
+    def fake_urlopen(*_args, **_kwargs):
+        wert = next(antworten)
+        if isinstance(wert, Exception):
+            raise wert
+        return wert
+
+    monkeypatch.setattr("wpanalyse.adapters.novelan_ladv9.urlopen", fake_urlopen)
+    monkeypatch.setattr("wpanalyse.adapters.novelan_ladv9.time.sleep", schlafzeiten.append)
+
+    df = _adapter().aktuell()
+
+    assert df.iloc[0]["aussen_c"] == 4.5
+    assert schlafzeiten == [1.0]

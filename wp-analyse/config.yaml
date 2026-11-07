@@ -1,0 +1,45 @@
+name: WP-Analyse
+version: "0.1.0"
+slug: wp_analyse
+description: Sammelt Home-Assistant-Messwerte einer Wärmepumpe in SQLite.
+url: "https://github.com/matzesonic1/wp-analyse/tree/main/wp-analyse"
+arch:
+  # armv7 ist mangels pandas-/NumPy-Wheel- oder Quellbuild-Validierung nicht freigegeben.
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: auto
+options:
+  ha_url: "http://homeassistant:8123"
+  ha_token: ""
+  entity_aussen_c: ""
+  entity_vorlauf_c: ""
+  entity_ruecklauf_c: ""
+  entity_verdichter_an: ""
+  entity_verdichter_hz: ""
+  entity_leistung_w: ""
+  entity_strom_kwh: ""
+  entity_waerme_kwh: ""
+  entity_heizstab_an: ""
+  entity_betriebsart: ""
+  entity_warmwasser_c: ""
+  entity_stoerung: ""
+  intervall_s: 60
+schema:
+  ha_url: str
+  ha_token: password
+  entity_aussen_c: str?
+  entity_vorlauf_c: str?
+  entity_ruecklauf_c: str?
+  entity_verdichter_an: str?
+  entity_verdichter_hz: str?
+  entity_leistung_w: str?
+  entity_strom_kwh: str?
+  entity_waerme_kwh: str?
+  entity_heizstab_an: str?
+  entity_betriebsart: str?
+  entity_warmwasser_c: str?
+  entity_stoerung: str?
+  intervall_s: int(60,86400)
+image: ghcr.io/matzesonic1/wp-analyse

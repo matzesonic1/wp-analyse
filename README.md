@@ -20,6 +20,10 @@ Luxtronik-Regler (Novelan/Alpha Innotec, nur lesend, alle 60 s). Details:
 Home-Assistant-Adapter: [`docs/novelan-ladv9-adapter.md`](docs/novelan-ladv9-adapter.md).
 Das Konzept für den Betrieb auf Home Assistant OS steht in
 [`docs/home-assistant-betrieb.md`](docs/home-assistant-betrieb.md).
+Für den Dauerbetrieb mit Home Assistant:
+`python -m wpanalyse.ha_monitor --intervall 60 --db data/wp.sqlite`.
+Die Supervisor-App und der Multi-Architektur-Image-Build liegen unter
+[`wp-analyse/`](wp-analyse/).
 Modbus und eine Stromzähler-Quelle (für die Arbeitszahl) sind noch nicht implementiert.
 
 ## Echtbetrieb

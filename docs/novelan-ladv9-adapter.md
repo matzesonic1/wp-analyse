@@ -73,9 +73,12 @@ Bei Unsicherheit Reglerdaten beim Installateur erfragen.
 
 `lese(von, bis)` fragt den Home-Assistant-Verlauf im Zeitraum `[von, bis)` ab;
 `aktuell()` liest die aktuellen Zustände. Beide Methoden verwenden die
-Home-Assistant-REST-API. Ein dauerhaft laufender Erfassungsprozess, der den
-Adapter regelmäßig aufruft und Messwerte speichert, ist derzeit noch nicht
-implementiert.
+Home-Assistant-REST-API. Der Dauerbetrieb erfolgt über
+`python -m wpanalyse.ha_monitor`; er fragt `aktuell()` ab und speichert in SQLite.
+Das Intervall und der Datenbankpfad können per CLI (`--intervall`, `--db`) oder
+Umgebungsvariablen (`WPANALYSE_INTERVAL`, `WPANALYSE_DB`) festgelegt werden. Bei
+vorübergehenden Netzwerkfehlern wiederholt der Adapter die Anfrage mit begrenztem
+exponentiellem Backoff.
 
 ## Entitäts-Mapping
 

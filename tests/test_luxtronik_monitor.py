@@ -116,3 +116,19 @@ def test_monitor_faengt_fehler_ab():
     with SQLiteSpeicher(":memory:") as speicher:
         adapter = Kaputt(LuxtronikConfig(host="x"), lambda h, p: None)
         assert Monitor(adapter, speicher).einmal() is False
+
+
+def test_monitor_behandelt_leere_messreihe_ohne_exception(caplog):
+    class LeererAdapter:
+        def aktuell(self):
+            return pd.DataFrame(index=pd.DatetimeIndex([], tz="UTC"))
+
+    with SQLiteSpeicher(":memory:") as speicher:
+        assert Monitor(LeererAdapter(), speicher).einmal() is False
+        gespeichert = speicher.lese(
+            pd.Timestamp("2000-01-01", tz="UTC"),
+            pd.Timestamp("2100-01-01", tz="UTC"),
+        )
+
+    assert gespeichert.empty
+    assert "Keine Messwerte empfangen" in caplog.text
