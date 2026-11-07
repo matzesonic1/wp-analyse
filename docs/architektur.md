@@ -32,7 +32,7 @@
 | `analyse/verdichter.py` | analyst | vorhanden (Richtwerte, Herstellerwerte offen) |
 | `analyse/spreizung.py`, `effizienz.py`, `komfort.py` | analyst | vorhanden; Grenzen und Tests siehe `backlog.md` |
 | `speicher/sqlite.py` | datensammler | relationales Zielschema und Migration im Code; vorhandene Live-DB noch im Altschema |
-| `erfassung.py`, `monitoring.py`, `tageslauf.py` | datensammler / alarm / analyst | Orchestrierungsfunktionen vorhanden; integrierter Scheduler/CLI `run.py` offen |
+| `erfassung.py`, `monitoring.py`, `tageslauf.py` | datensammler / alarm / analyst | Orchestrierungsfunktionen vorhanden; `run.py` verbindet die drei Abläufe |
 | `alarm/` | alarm | AlarmManager und ntfy vorhanden; Telegram und Laufzeitverdrahtung fehlen |
 | `bericht/tagesbericht.py` | analyst | vorhanden |
 | `dashboard.py` | Streamlit-Dashboard | vorhanden (Live und Simulation) |

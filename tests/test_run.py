@@ -27,12 +27,16 @@ def test_scheduler_sammelt_minutlich_und_prueft_alle_15_minuten(tmp_path):
     uhr = _Uhr(datetime(2026, 1, 2, 12, tzinfo=UTC))
     sammlungen = []
     pruefungen = []
+    gestoppt = False
 
     def sammeln(_adapter, _speicher, von, bis):
         sammlungen.append((von, bis))
 
     def pruefen(_speicher, _alarm_manager, _cfg, von, bis):
+        nonlocal gestoppt
         pruefungen.append((von, bis))
+        if len(pruefungen) == 2:
+            gestoppt = True
 
     scheduler = run.Scheduler(
         object(),
@@ -48,7 +52,7 @@ def test_scheduler_sammelt_minutlich_und_prueft_alle_15_minuten(tmp_path):
         bericht=lambda *_args: pytest.fail("Vor Mitternacht darf kein Bericht entstehen"),
     )
 
-    scheduler.laufen(stop=lambda: bool(pruefungen and uhr.jetzt() >= pruefungen[0][1] + timedelta(minutes=15)))
+    scheduler.laufen(stop=lambda: gestoppt)
 
     assert len(sammlungen) == 16
     assert sammlungen[0] == (

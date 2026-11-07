@@ -8,7 +8,8 @@ import signal
 import threading
 import time
 from collections.abc import Callable, Sequence
-from datetime import UTC, date, datetime, time as datetime_time, timedelta
+from datetime import UTC, datetime, timedelta
+from datetime import time as datetime_time
 from pathlib import Path
 
 from .adapters.novelan_ladv9 import NovelanLadv9Adapter
@@ -190,7 +191,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except KeyboardInterrupt:
         log.info("Dauerbetrieb durch Benutzer beendet")
         return 0
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Laufzeitfehler erhalten einen sichtbaren Fehlerstatus.
         log.error("Dauerbetrieb fehlgeschlagen (%s)", type(exc).__name__)
         return 2
 
