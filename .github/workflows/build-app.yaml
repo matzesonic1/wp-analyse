@@ -147,10 +147,21 @@ jobs:
       - name: Check that the GHCR version tag is unused
         env:
           APP_VERSION: ${{ needs.prepare.outputs.version }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_USER: ${{ github.actor }}
           IMAGE: ${{ needs.prepare.outputs.image }}
         run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            changed_files="$(git diff --name-only "${BASE_SHA}" "${GITHUB_SHA}")"
+            if ! grep -Eq \
+              '^(wp-analyse/|src/wpanalyse/|pyproject\.toml$|README\.md$)' \
+              <<< "${changed_files}"; then
+              echo "No app files changed; GHCR tag check is not required."
+              exit 0
+            fi
+          fi
+
           registry_path="${IMAGE#ghcr.io/}"
           token_response="$(curl --fail --silent --show-error \
             --user "${GH_USER}:${GH_TOKEN}" \
