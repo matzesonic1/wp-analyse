@@ -18,6 +18,8 @@ Die App läuft mit **simulierten Daten** oder mit **echten Messwerten** direkt v
 Luxtronik-Regler (Novelan/Alpha Innotec, nur lesend, alle 60 s). Details:
 [`docs/luxtronik-anbindung.md`](docs/luxtronik-anbindung.md). Alternativ gibt es einen
 Home-Assistant-Adapter: [`docs/novelan-ladv9-adapter.md`](docs/novelan-ladv9-adapter.md).
+Das Konzept für den Betrieb auf Home Assistant OS steht in
+[`docs/home-assistant-betrieb.md`](docs/home-assistant-betrieb.md).
 Modbus und eine Stromzähler-Quelle (für die Arbeitszahl) sind noch nicht implementiert.
 
 ## Echtbetrieb
