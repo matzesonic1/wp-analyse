@@ -58,17 +58,23 @@ Wartezeiten laufen. Der lokale Qualitätslauf besteht aus `ruff check .` und `py
 
 ### CI-/Build-Abgrenzung
 
-**Geplant, noch nicht implementiert:** Ein GitHub-Actions-Workflow führt bei Pull Requests und
-Pushes auf `main` Ruff und pytest aus (Installation über `pip install -e ".[dev]"`, mindestens
-Python 3.11). Diese Qualitätschecks sollen als erforderliche Statusprüfung vor dem Merge
-konfiguriert werden. Der bestehende [`build-app.yaml`](../.github/workflows/build-app.yaml)
-bleibt für das Bauen und Veröffentlichen des Home-Assistant-Images zuständig und wird nicht
-durch Tests mit Live-Zugangsdaten ergänzt. Ein erfolgreicher Image-Build allein gilt nicht als
-Nachweis, dass Tests und Lint erfolgreich waren; die erforderliche Statusprüfung muss in den
-Repository-Einstellungen aktiviert werden.
+Der Workflow [`quality-checks.yaml`](../.github/workflows/quality-checks.yaml) führt bei
+jedem Pull Request und bei Pushes auf `main` den Job „Python quality checks“ mit Python 3.11
+aus. Er installiert das Projekt samt Entwicklungsabhängigkeiten mit
+`python -m pip install -e ".[dev]"` und führt `ruff check .` sowie `pytest` aus. Die lokalen
+Prüfungen entsprechen den CI-Kommandos; nach der Installation sind sie mit `ruff check .`
+und `pytest` ausführbar.
 
-Die konkrete Workflow-Konfiguration und die abschließende Dokumentation der tatsächlich
-aktiven Checks sind als Issues 15 und 16 im [`Backlog`](backlog.md) geplant.
+Der Workflow [`build-app.yaml`](../.github/workflows/build-app.yaml) bleibt getrennt und
+baut beziehungsweise veröffentlicht das Home-Assistant-Image. Weder der Qualitätsworkflow
+noch der Image-Build benötigen für diese Prüfungen Live-Zugangsdaten oder Zugriffe auf
+Wärmepumpen und Home Assistant. Tests mit Fakes und synthetischen Daten belegen keine reale
+Geräteverbindung; Live- und Deployment-Prüfungen bleiben manuell.
+
+Damit die Qualitätschecks ein Merge-Gate sind, muss die Repository-Administration den
+Statuscheck des Jobs in den Branch-Protection- beziehungsweise Ruleset-Einstellungen für
+`main` als erforderlich aktivieren. Ein erfolgreicher Image-Build allein weist nicht nach,
+dass Ruff und pytest erfolgreich waren.
 
 ## Live-Datenfluss
 ```

@@ -12,8 +12,13 @@ entwickelt mit **mehreren GitHub-Copilot-Agenten**.
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 python -m wpanalyse.demo          # erzeugt Testdaten und zeigt erste Kennzahlen
+ruff check .
 pytest
 ```
+Der GitHub-Actions-Workflow `Quality checks` führt Ruff und pytest bei Pull Requests und
+Pushes auf `main` aus. Er ist vom Home-Assistant-Image-Build getrennt und benötigt keine
+Live-Geräte oder Zugangsdaten. Damit die Prüfungen Merge-Voraussetzung sind, muss der
+Statuscheck in den Repository-Regeln für `main` als erforderlich aktiviert werden.
 Die App läuft mit **simulierten Daten** oder mit **echten Messwerten** direkt vom
 Luxtronik-Regler (Novelan/Alpha Innotec, nur lesend, alle 60 s). Details:
 [`docs/luxtronik-anbindung.md`](docs/luxtronik-anbindung.md). Alternativ gibt es einen
