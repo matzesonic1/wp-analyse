@@ -22,6 +22,13 @@ _SPEZ.loader.exec_module(ha_app_run)
 def test_supervisor_uebergibt_logstufe(monkeypatch, optionen, logstufe):
     """Supervisor-Optionen setzen die Umgebungsstufe mit INFO-Standard."""
     aufrufe = {}
+    for variable in (
+        "HA_URL",
+        "HA_TOKEN",
+        "WPANALYSE_LOG_LEVEL",
+        *ha_app_run._ENTITY_UMGEBUNGSMAPPING.values(),
+    ):
+        monkeypatch.delenv(variable, raising=False)
     monkeypatch.setattr(ha_app_run, "_optionen_laden", lambda: optionen)
 
     def main_spion(argv):
