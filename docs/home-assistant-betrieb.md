@@ -106,6 +106,28 @@ eine Abfrage aus. Das Pollingintervall wird zum Schutz des Reglers mindestens au
 60 Sekunden begrenzt. Netzwerkfehler lösen begrenzte Wiederholungen mit
 exponentiellem Backoff aus; fehlgeschlagene Messungen werden nicht ergänzt.
 
+### Logs und Log-Stufe
+
+Der Prozess schreibt Logs nach `stdout`. Standardmäßig gilt `INFO`; für zusätzliche
+Diagnosen wird `WPANALYSE_LOG_LEVEL=DEBUG` in der Prozessumgebung gesetzt, zum Beispiel:
+
+```bash
+WPANALYSE_LOG_LEVEL=DEBUG python -m wpanalyse.ha_monitor --intervall 60 --db data/wp.sqlite
+```
+
+Bei einem eigenständigen Dienst muss die Variable in dessen Dienst- oder
+Container-Umgebung gesetzt werden. Im Home-Assistant-App-Betrieb sind die
+Container-Ausgaben unter **Einstellungen → Apps → WP-Analyse → Protokolle** (App-Logs)
+einsehbar. Die Supervisor-App-Konfiguration stellt derzeit noch keine Log-Stufe
+bereit und die Einstiege lesen `WPANALYSE_LOG_LEVEL` noch nicht aus; bis zur
+gemeinsamen Implementierung gilt daher die fest codierte Stufe `INFO`. Danach soll
+eine App-Option für die Log-Stufe denselben Wert an `WPANALYSE_LOG_LEVEL` übergeben.
+
+Logs enthalten keine Zugangsdaten wie `HA_TOKEN`. Fehlermeldungen aus externen
+Systemen werden auf eine sichere Zusammenfassung begrenzt; ungeprüfte Fehlertexte
+und Tracebacks werden nicht ausgegeben. Die Log-Regeln und der aktuelle
+Implementierungsstand sind in der [Architektur](architektur.md#logging) festgehalten.
+
 ### Betrieb auf demselben Raspberry Pi mit Home Assistant OS
 
 Die App ist als benutzerdefiniertes Supervisor-App-Repository vorbereitet. Für
