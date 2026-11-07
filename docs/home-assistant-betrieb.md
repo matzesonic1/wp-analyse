@@ -143,6 +143,13 @@ kein Ersatz für eine neue App-Version. Ein Release-Commit sollte zusätzlich mi
 dem dazu passenden Git-Tag `vMAJOR.MINOR.PATCH` markiert werden; der Workflow
 wird durch den Push nach `main`, nicht durch den Tag ausgelöst.
 
+Der Workflow prüft die Version vor dem Build gegen vorhandene GHCR-Versionstags
+und bricht ab, wenn der Tag schon existiert oder die Registry-Abfrage fehlschlägt.
+Bei Pull Requests mit Änderungen an App oder Anwendungscode muss die Version
+außerdem höher als die Version auf `main` sein. Damit schlägt ein fehlender
+Versionsschritt bereits im Pflichtcheck fehl; `latest` wird nicht als Nachweis
+verwendet.
+
 Die Version in `pyproject.toml` bezeichnet die Python-Distribution und wird vom
 App-Image-Workflow nicht als Quelle verwendet. Sie wird unabhängig gepflegt,
 solange keine Python-Paketveröffentlichung mit eigener Versionsfreigabe erfolgt.
