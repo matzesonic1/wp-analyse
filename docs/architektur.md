@@ -20,20 +20,25 @@
 | `models.py` | architekt | vorhanden |
 | `config.py` | architekt | vorhanden |
 | `simulation.py` | tester | Grundversion |
-| `adapters/base.py`, `adapters/csv_adapter.py` | datensammler | vorhanden |
+| `adapters/base.py`, `adapters/csv_adapter.py` | datensammler | generischer CSV-Adapter vorhanden; fokussiertes Luxtronik-CSV-Mapping offen |
 | `adapters/luxtronik.py` | datensammler | vorhanden (nur lesend, Live) |
 | `adapters/novelan_ladv9.py` | datensammler | vorhanden (Home-Assistant-REST-API) |
 | `monitor.py` | datensammler | vorhanden (60-s-Abfrage nach SQLite) |
 | `ha_monitor.py` | datensammler | vorhanden (Home-Assistant-Adapter und SQLite) |
 | `testseite.py` | datensammler | vorhanden (manuelle Testabfrage) |
-| `wp-analyse/` | datensammler | Supervisor-App, Images für `aarch64` und `amd64` |
+| `wp-analyse/` | datensammler | Supervisor-App-Konfiguration und Dockerfile vorhanden; Installation, Image-Build und Laufzeit nicht verifiziert |
 | `analyse/taktung.py` | analyst | Beispiel vorhanden |
 | `analyse/verdichter.py` | analyst | vorhanden (Richtwerte, Herstellerwerte offen) |
-| `analyse/*` (weitere) | analyst | offen |
-| `speicher/sqlite.py` | datensammler | SQLite-Speicher vorhanden (JSON-Zeilenformat; relationales Zielschema offen) |
-| `alarm/` | alarm | offen |
+| `analyse/spreizung.py`, `effizienz.py`, `komfort.py` | analyst | vorhanden; Grenzen und Tests siehe `backlog.md` |
+| `speicher/sqlite.py` | datensammler | relationales Zielschema und Migration im Code; vorhandene Live-DB noch im Altschema |
+| `erfassung.py`, `monitoring.py`, `tageslauf.py` | datensammler / alarm / analyst | Orchestrierungsfunktionen vorhanden; integrierter Scheduler/CLI `run.py` offen |
+| `alarm/` | alarm | AlarmManager und ntfy vorhanden; Telegram und Laufzeitverdrahtung fehlen |
 | `bericht/tagesbericht.py` | analyst | vorhanden |
 | `dashboard.py` | Streamlit-Dashboard | vorhanden (Live und Simulation) |
+
+Die Statusangaben beziehen sich auf Code im Repository und die unten aufgeführte
+Live-Verifikation, nicht auf einen validierten Dauerbetrieb. Tests mit Fakes belegen
+keine reale Verbindung zum Regler oder zu Home Assistant.
 
 ## Live-Datenfluss
 ```
@@ -45,6 +50,14 @@ Der Regler hat keine Historie; Daten entstehen nur, solange Monitor oder Dashboa
 Das Dashboard fragt nur ab, wenn die letzte Messung älter als das Intervall ist.
 Siehe [`luxtronik-anbindung.md`](luxtronik-anbindung.md).
 
+Die am 07.11.2026 geprüfte `data/wp.sqlite` enthielt 58 Messungen, bestand die
+SQLite-Integritätsprüfung und wies 5 Abstände von mehr als 90 Sekunden auf. Sie enthält
+noch das Altschema `messwerte(zeit_ns, daten)` statt des relationalen Zielschemas.
+**Vor dem ersten Öffnen dieser Datei mit dem aktuellen `SQLiteSpeicher` sichern**: Die
+Schema-Migration wird beim Initialisieren automatisch ausgeführt.
+Der Live-Reglerzugriff über das Streamlit-Dashboard wurde am selben Tag erfolgreich
+geprüft; Dauerbetrieb ist nicht validiert.
+
 ## Home-Assistant-App
 
 ```
@@ -52,12 +65,16 @@ Wärmepumpe → Home-Assistant-Integration → HA-Entitäten / REST-API
           → NovelanLadv9Adapter → ha_monitor.py → SQLiteSpeicher (/data/wp.sqlite)
 ```
 
-`python -m wpanalyse.ha_monitor` startet den eigenständigen Monitor. Auf Home
-Assistant OS wird er von der Supervisor-App in `wp-analyse/` gestartet. Die
-App-Optionen liefern HA-URL, Token und Entity-IDs; die SQLite-Datei liegt im
-persistent gesicherten App-Verzeichnis `/data`. Der App-Build unterstützt
-`aarch64` (64-Bit-Raspberry-Pi) und `amd64`; `armv7`/32-Bit ist nicht freigegeben.
-Ein nativer Home-Assistant-Integration- oder Dashboard-Export ist nicht enthalten.
+`python -m wpanalyse.ha_monitor` startet den eigenständigen Monitor. Das Repository
+enthält die Supervisor-App unter `wp-analyse/`, deren Einstieg `ha_monitor.py` mit
+Supervisor-Optionen startet. Der lokale amd64-Container-Build war laut
+[`home-assistant-betrieb.md`](home-assistant-betrieb.md) erfolgreich; Installation und
+tatsächlicher Start auf Home Assistant OS wurden nicht verifiziert. Die App-Konfiguration
+legt `/data/wp.sqlite` als Datenbankpfad fest; ob dieses Verzeichnis im Zielsystem
+dauerhaft gesichert wird, hängt von der jeweiligen Installation ab. Der App-Build ist
+für `aarch64` und `amd64` konfiguriert; der aarch64-Build wurde nicht nachgewiesen.
+`armv7`/32-Bit ist nicht freigegeben. Ein nativer Home-Assistant-Integration- oder
+Dashboard-Export ist nicht enthalten.
 
 ## Datenformat
 Ein pandas-DataFrame mit `DatetimeIndex` (UTC), eine Spalte je Feld aus `docs/fachwissen.md`.
@@ -131,15 +148,19 @@ unverändert; dekodierte Diagnosen benötigen eine separat geprüfte Code-Zuordn
 später nötig, um Defektvorhersagen mit bestätigten Fällen statt bloßen Auffälligkeiten zu bewerten.
 
 ### Importzuordnung und Migration
-Der Luxtronik-CSV-Export kann zunächst `aussen_c`, `vorlauf_c`, `ruecklauf_c`, `verdichter_an`,
-`heizstab_an`, `betriebsart` und `verdichter_starts_zaehler` befüllen; die namenlose erste Spalte
-ist der Zeitstempel. `waerme_w` bleibt Wärmeleistung. Im vorliegenden Export gibt es keine
-bestätigte elektrische Leistung oder elektrische Energie, daher bleiben `leistung_w`,
-`strom_kwh` und `waerme_kwh` leer und die Arbeitszahl nicht berechenbar. `lux_ID_WEB_WMZ_*`,
+Die geplante Luxtronik-CSV-Zuordnung umfasst `aussen_c`, `vorlauf_c`, `ruecklauf_c`,
+`verdichter_an`, `heizstab_an`, `betriebsart` und `verdichter_starts_zaehler`; die namenlose
+erste Spalte ist der Zeitstempel. Der generische `CsvAdapter` setzt derzeit eine benannte
+Zeitspalte voraus und implementiert diese Feldzuordnung noch nicht. `waerme_w` bleibt
+Wärmeleistung. Im vorliegenden Export gibt es keine bestätigte elektrische Leistung oder
+elektrische Energie, daher sind `leistung_w`, `strom_kwh` und `waerme_kwh` aus diesem Export
+nicht belegbar und die Arbeitszahl nicht berechenbar. `lux_ID_WEB_WMZ_*`,
 Laufzeit-/Abtauungswerte und `ERROR_Nr0–4` werden erst nach Prüfung ihrer Bedeutung und Einheit
 zugeordnet.
 
-Der aktuelle `SQLiteSpeicher` verwendet `messwerte(zeit_ns, daten)` mit JSON-Nutzdaten. Die
-Umstellung auf Tabellen mit festen Spalten muss vorhandene Daten erhalten: bisherige Zeilen sind
-unter einer dokumentierten Standard-Anlagen-ID zu migrieren. DataFrame-Schnittstelle,
-UTC-Normalisierung, Zeitraumabfragen und Ersetzen desselben Zeitpunkts je Anlage bleiben erhalten.
+Der aktuelle `SQLiteSpeicher` verwendet das relationale Zielschema und migriert das frühere
+`messwerte(zeit_ns, daten)`-Format beim Öffnen unter der Standard-Anlagen-ID. Diese Migration
+ist im Code implementiert; ein Migrationstest mit synthetischen Testdaten ist vorhanden,
+wurde hier mangels pytest in der Projektumgebung aber nicht ausgeführt. Die am 07.11.2026 vorhandene `data/wp.sqlite` liegt
+jedoch noch im alten Format; sie wurde nicht migriert. Vor ihrer ersten Öffnung mit dem
+aktuellen Speicher ist eine Sicherung erforderlich.

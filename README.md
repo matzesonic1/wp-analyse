@@ -52,7 +52,7 @@ Arbeitszahl über der Außentemperatur sowie eine freie Auswahl aller gespeicher
 | `docs/lernpfad.md` | **Hier anfangen**: Schritt-für-Schritt lernen, mit Agenten zu arbeiten |
 | `docs/architektur.md` | Datenfluss und Module |
 | `docs/fachwissen.md` | Kennzahlen und Anomalie-Regeln für Wärmepumpen |
-| `docs/backlog.md` | Fertige Issues zum Verteilen an Agenten |
+| `docs/backlog.md` | Issues mit Entwicklungsstatus und belegten Einschränkungen |
 | `src/wpanalyse/` | Code-Gerüst (Datenmodell, Adapter, erste Analyse) |
 
 ## Agenten auswählen

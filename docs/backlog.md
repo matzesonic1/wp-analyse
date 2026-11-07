@@ -3,26 +3,93 @@
 Jedes Issue ist so geschnitten, dass ein Agent es in einem PR erledigen kann.
 **Parallel-Gruppe**: Issues derselben Gruppe berühren keine gemeinsamen Dateien und können gleichzeitig laufen.
 
-| # | Titel | Agent | Parallel-Gruppe | Abhängig von |
-|---|---|---|---|---|
-| 1 | Spreizungs-Analyse | analyst | A | – |
-| 2 | Adapter für meine Wärmepumpe | datensammler | A | – |
-| 3 | Heizstab- und Effizienz-Analyse | analyst | B | 1 |
-| 4 | Raumkomfort-Analyse | analyst | C | – |
-| 5 | Simulation: Fehlerszenarien | tester | A | – |
-| 6 | Alarm-Grundgerüst mit Telegram/ntfy | alarm | B | – |
-| 7 | SQLite-Speicher | datensammler | B | 2 |
-| 8 | Tagesbericht | analyst | – | 1, 3, 4 |
-| 9 | Dauerbetrieb (Scheduler: sammeln → analysieren → melden) | architekt → alle | – | 6, 7 |
-| 9a | Sammeln und Speichern orchestrieren | datensammler | D | 2, 7 |
-| 9b | Regelprüfung und Alarmierung orchestrieren | alarm | D | 1, 3, 4, 6, 7 |
-| 9c | Tagesbericht aus dem Speicher erzeugen | analyst | D | 7, 8 |
-| 9d | CLI und Scheduler integrieren | architekt | – | 9a, 9b, 9c |
-| 10 | Dashboard (Streamlit) | analyst | – | 7 |
-| 11 | Luxtronik-CSV: Feldinventur und fokussierter Import | datensammler | – | – |
-| 12 | SQLite-Kernschema für Anlagen und Messwerte | datensammler | – | bestehender SQLite-Speicher |
-| 13 | Raumtemperaturen relational speichern | datensammler | – | 12 |
-| 14 | Störungs- und Wartungsereignisse speichern | datensammler | – | 13 |
+Der Status bewertet den **im Repository vorhandenen Implementierungs- und Teststand**,
+nicht Installation, Verfügbarkeit oder Betriebsreife eines Live-Systems. „Fertig“ bedeutet
+hier: der beschriebene Codepfad ist vorhanden und durch Tests abgedeckt; reale
+Regler-/Home-Assistant-Zugriffe und App-Deployment sind damit nicht nachgewiesen.
+
+| # | Titel | Agent | Parallel-Gruppe | Abhängig von | Status und belegte Einschränkung |
+|---|---|---|---|---|---|
+| 1 | Spreizungs-Analyse | analyst | A | – | **fertig** – `analyse/spreizung.py`, `tests/test_spreizung.py`; Bewertung beruht auf den implementierten Richtwerten. |
+| 2 | Adapter für meine Wärmepumpe | datensammler | A | – | **fertig** – Luxtronik- und Novelan/HA-Adapter mit Tests; reale Geräte-/HA-Verbindung nicht durch Tests belegt. Luxtronik liefert nur aktuelle Werte, keine Historie. |
+| 3 | Heizstab- und Effizienz-Analyse | analyst | B | 1 | **fertig** – `analyse/effizienz.py`, `tests/test_effizienz.py`; AZ setzt geeignete Energie- und Außentemperaturwerte voraus. |
+| 4 | Raumkomfort-Analyse | analyst | C | – | **fertig** – `analyse/komfort.py`, `tests/test_komfort.py`; tatsächliche Raumwerte und Sollwerte müssen bereitgestellt werden. |
+| 5 | Simulation: Fehlerszenarien | tester | A | – | **fertig** – Szenarien und Tests in `simulation.py`, `tests/test_simulation.py`; Simulation ist kein Live-Nachweis. |
+| 6 | Alarm-Grundgerüst mit Telegram/ntfy | alarm | B | – | **fertig** – `AlarmManager` und getesteter ntfy-Melder erfüllen das „und/oder“ im Issue; Telegram ist nicht implementiert. Die Alarmierung ist noch nicht mit einem gestarteten Gesamtprozess verdrahtet, Alarmzustand bleibt im Prozessspeicher. |
+| 7 | SQLite-Speicher | datensammler | B | 2 | **fertig** – Speicher-API und Persistenztests vorhanden; der aktuelle Live-Datenbestand ist davon getrennt und hat noch das alte Schema (siehe Live-Verifikation unten). |
+| 8 | Tagesbericht | analyst | – | 1, 3, 4 | **fertig** – Berichtsgenerator und Tests vorhanden; Datenqualität und Abdeckung begrenzen die Aussage des Berichts. |
+| 9 | Dauerbetrieb (Scheduler: sammeln → analysieren → melden) | architekt → alle | – | 6, 7 | **teilweise** – Funktionen 9a–9c sind vorhanden; integrierter `wpanalyse.run`-Scheduler (9d) fehlt. `monitor`/`ha_monitor` pollen und speichern, führen aber nicht den vollständigen Ablauf aus. |
+| 9a | Sammeln und Speichern orchestrieren | datensammler | D | 2, 7 | **fertig** – `erfassung.py`, `tests/test_erfassung.py`; keine eigene Zeitplanung (wie vorgesehen). |
+| 9b | Regelprüfung und Alarmierung orchestrieren | alarm | D | 1, 3, 4, 6, 7 | **fertig** – `monitoring.py`, `tests/test_monitoring.py`; wird noch nicht durch einen Gesamt-Scheduler regelmäßig gestartet. |
+| 9c | Tagesbericht aus dem Speicher erzeugen | analyst | D | 7, 8 | **fertig** – `tageslauf.py`, `tests/test_tageslauf.py`; wird noch nicht durch einen Gesamt-Scheduler täglich gestartet. |
+| 9d | CLI und Scheduler integrieren | architekt | – | 9a, 9b, 9c | **offen** – `src/wpanalyse/run.py` und `tests/test_run.py` sind nicht vorhanden; kein integrierter Scheduler für 9a–9c. |
+| 10 | Dashboard (Streamlit) | analyst | – | 7 | **fertig** – Dashboard-Code und Hilfsfunktionstests vorhanden; Live-Reglerzugriff mit Streamlit am 07.11.2026 erfolgreich geprüft. Dauerbetrieb ist nicht validiert. |
+| 11 | Luxtronik-CSV: Feldinventur und fokussierter Import | datensammler | – | – | **teilweise** – generischer `CsvAdapter` existiert; die geforderte `mappe_luxtronik_csv`-Feldzuordnung (inkl. namenloser Zeitspalte) und CSV-spezifische Tests fehlen. |
+| 12 | SQLite-Kernschema für Anlagen und Messwerte | datensammler | – | bestehender SQLite-Speicher | **fertig im Code** – Zieltabellen und Migration in `speicher/sqlite.py`; ein Migrationstest ist in `tests/test_sqlite_speicher.py` vorhanden, aber pytest wurde hier nicht ausgeführt (in der Projektumgebung nicht verfügbar). Die vorhandene `data/wp.sqlite` ist noch nicht migriert; vor dem ersten Öffnen mit dem aktuellen Speicher sichern. |
+| 13 | Raumtemperaturen relational speichern | datensammler | – | 12 | **teilweise** – relationale Raumwerte und Tests vorhanden; umgesetzt über `speichern`/`lese_raum_messwerte` statt der im Issue benannten Methoden `speichere_raeume`/`lese_raeume`; Live-DB noch im Altschema. |
+| 14 | Störungs- und Wartungsereignisse speichern | datensammler | – | 13 | **teilweise** – Speicherung, Bereichsabfragen und Tests vorhanden; die Methoden heißen `speichern_stoerung`/`speichern_wartung_reparatur` statt der im Issue benannten Schnittstellen. Tatsächliche Ereignisdaten und Live-Migration sind nicht nachgewiesen. |
+
+#### Zusammenspiel der Teilbereiche
+
+Durchgezogene Pfeile zeigen implementierte Pfade und Funktionsaufrufe; die getrennte
+Darstellung macht sichtbar, dass die Analyse-/Berichtsfunktionen nicht automatisch aus den
+Erfassungspfaden gestartet werden. Gestrichelte Scheduler-Pfeile markieren die noch offene
+zeitgesteuerte Integration.
+
+```mermaid
+flowchart LR
+    lux[Luxtronik-Regler]
+    ha[Home Assistant]
+    luxAdapter[LuxtronikAdapter]
+    haAdapter[NovelanLadv9Adapter]
+    monitor[Monitor]
+    haMonitor[ha_monitor]
+    dashboard[Streamlit-Dashboard]
+    db[(SQLite)]
+
+    subgraph live[Implementierte Erfassungs- und Anzeigepfade]
+        lux --> luxAdapter
+        luxAdapter --> monitor
+        monitor --> db
+        dashboard -->|Live-Abfrage bei Bedarf| luxAdapter
+        dashboard --> db
+        ha --> haAdapter
+        haAdapter --> haMonitor
+        haMonitor --> monitor
+    end
+
+    subgraph modules[Vorhandene Funktionen, nicht automatisch aus den Live-Pfaden gestartet]
+        capture[9a Sammeln und Speichern]
+        check[9b Regelprüfung und Analysen]
+        alarms[AlarmManager / ntfy]
+        report[9c Tagesbericht]
+        check --> alarms
+    end
+
+    db -->|liest Messwerte| check
+    db -->|liest Tageswerte| report
+    capture -->|schreibt Messwerte| db
+
+    scheduler[9d CLI / Scheduler offen]
+    scheduler -.-> capture
+    scheduler -.-> check
+    scheduler -.-> report
+```
+
+#### Live-Verifikation (07.11.2026)
+
+Die vorhandene `data/wp.sqlite` wurde **nur lesend** geprüft: 58 Messungen, `PRAGMA
+integrity_check` ergibt `ok`, und es gibt 5 Abstände von mehr als 90 Sekunden. Der
+Live-Reglerzugriff über das Streamlit-Dashboard wurde am 07.11.2026 erfolgreich getestet;
+ein durchgehender oder längerfristiger Dauerbetrieb ist damit nicht validiert. Die Datei
+enthält weiterhin ausschließlich das alte Schema `messwerte(zeit_ns, daten)` und
+`metadaten`; die neuen Tabellen `anlage` und `messwert` fehlen. Die Migration ist zwar
+im aktuellen SQLite-Speichercode implementiert; ein Test mit einer synthetischen
+Testdatenbank ist vorhanden, wurde hier mangels pytest in der Projektumgebung aber nicht
+ausgeführt. An dieser Live-Datei ist die Migration noch nicht erfolgt. **Vor jedem Öffnen mit dem
+aktuellen `SQLiteSpeicher` unbedingt eine Sicherungskopie erstellen**, da dessen
+Initialisierung die Migration automatisch ausführt. Diese Prüfung belegt weder
+ununterbrochenen Betrieb noch die Verfügbarkeit einer externen Quelle oder Betriebsreife.
 
 ---
 
