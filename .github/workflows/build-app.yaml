@@ -47,7 +47,7 @@ jobs:
 
       - name: Validate supported architectures
         run: |
-          configured="$(awk '/^arch:/{in_arch=1; next} in_arch && /^  - /{print $2; next} in_arch{exit}' wp-analyse/config.yaml)"
+          configured="$(awk '/^arch:/{in_arch=1; next} in_arch && /^[[:space:]]*(#|$)/{next} in_arch && /^  - /{print $2; next} in_arch{exit}' wp-analyse/config.yaml)"
           expected="$(printf 'aarch64\namd64')"
           if [[ "${configured}" != "${expected}" ]]; then
             echo "::error::Only aarch64 and amd64 are supported by this app build."
