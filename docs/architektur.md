@@ -41,6 +41,45 @@ Die Statusangaben beziehen sich auf Code im Repository und die unten aufgeführt
 Live-Verifikation, nicht auf einen validierten Dauerbetrieb. Tests mit Fakes belegen
 keine reale Verbindung zum Regler oder zu Home Assistant.
 
+## Streamlit-Dashboard
+
+Das Dashboard (`src/wpanalyse/dashboard.py`) zeigt im Hauptbereich zuerst die aktuellen
+Messwerte und die Verdichterbewertung, danach Temperatur-, Leistungs-, Start- und
+Laufzeitverläufe, Betriebsart und – sofern die Daten reichen – den AZ-Vergleich. Eine
+freie Messwertauswahl mit Kennzahlen und optional getrennten Diagrammen sowie eine
+aufklappbare Tabelle aller Messwerte schließen den Bereich ab. Abschnitte, für die
+keine passenden Messwerte vorliegen, zeigen einen erklärenden Hinweis oder entfallen.
+
+Die Sidebar wählt die Datenquelle (Live-Betrieb oder Simulation). Im Live-Betrieb
+enthält sie außerdem Luxtronik-Host und -Port sowie den dargestellten Zeitraum
+(1–72 Stunden, Standard 6 Stunden); das konfigurierte Abfrageintervall wird im
+Hauptbereich angezeigt. Live-Abfragen erfolgen nur lesend und höchstens im
+konfigurierten Intervall. In der Simulation zeigt das Hauptfeld den Hinweis
+„Simulierte Messdaten“ und verwendet simulierte Daten statt Regler und SQLite.
+
+Die Logging-Steuerung gehört ebenfalls in die Sidebar und ist getrennt von der
+Datenquellenauswahl:
+
+- „Anwendungslogs“ ist ein Ein/Aus-Schalter, kein Logstufenwert. Standardmäßig ist
+  er eingeschaltet. Daneben wählt eine Logstufen-Auswahl `DEBUG`, `INFO`, `WARNING`
+  oder `ERROR`; sie bezeichnet die Mindeststufe, die ausgegeben wird. Die Auswahl ist
+  nur aktiv, wenn Anwendungslogs eingeschaltet sind.
+- „Aus“ unterdrückt `DEBUG`, `INFO` und `WARNING`; `ERROR`-Meldungen bleiben immer
+  erhalten. Mit eingeschaltetem Logging gilt die gewählte Mindeststufe, wobei
+  `ERROR` ebenfalls nie unterdrückt wird. Das verhindert, dass ein Diagnose-Schalter
+  Fehler unsichtbar macht.
+- Die GUI-Einstellung wirkt auf den gesamten Dashboard-Prozess und damit auf alle
+  Browser-Sitzungen dieses Prozesses, nicht nur auf den Browser, der sie geändert hat.
+  Sie gilt bis zur nächsten Änderung oder zum Neustart des Prozesses und wird nicht
+  dauerhaft gespeichert. Beim Start initialisiert `WPANALYSE_LOG_LEVEL` die Stufe
+  (Standard `INFO`); eine Änderung in der GUI hat bis zum Neustart Vorrang.
+- Betroffen sind die Anwendungs-Logmeldungen des Dashboard-Prozesses, einschließlich
+  der von ihm aufgerufenen WP-Analyse-Module. Sie erscheinen auf `stdout` und damit
+  je nach Startart im Terminal beziehungsweise in den Supervisor-App-Logs. Sie werden
+  nicht als Logansicht im Dashboard-Hauptbereich dargestellt. Streamlit-eigene
+  Server-/Zugriffsprotokolle und die sichtbare Fehleranzeige der Oberfläche sind
+  davon unabhängig.
+
 ## Test- und CI-Konzept
 
 ### Testebenen
@@ -79,24 +118,35 @@ dass Ruff und pytest erfolgreich waren.
 
 ## Protokollierung
 
-Für alle Anwendungseinstiege gilt als Ziel ein einheitliches Logging mit `INFO` als
-Standardstufe. `WPANALYSE_LOG_LEVEL` überschreibt die Stufe; `DEBUG` dient der gezielten
-Fehlersuche. Die Ausgabe erfolgt nach `stdout`, damit sie in Terminals und von
-Prozess-/Container-Managern gesammelt werden kann. Die Einstiege sollen dafür eine gemeinsame
-Funktion `konfiguriere_logging(stufe: str | None = None) -> None` verwenden.
+Für die Prozess-Einstiege gilt ein einheitliches Logging mit `INFO` als Standardstufe.
+`WPANALYSE_LOG_LEVEL` setzt die Mindeststufe; `DEBUG` dient der gezielten Fehlersuche.
+Die Ausgabe erfolgt nach `stdout`, damit sie in Terminals und von Prozess-/
+Container-Managern gesammelt werden kann. Die gemeinsame Funktion lautet
+`konfiguriere_logging(stufe: str | None = None) -> None` und ist in
+`wpanalyse.logging_config` implementiert.
 
-Logs enthalten weder Zugangsdaten (insbesondere `HA_TOKEN`) noch vollständige
-Konfigurationswerte, Rohantworten oder unsichere Fehlerdetails und Tracebacks aus externen
-Bibliotheken. Fehler werden mit einer sicheren Zusammenfassung protokolliert; Zugangsdaten
-aus Logs herauszufiltern ersetzt nicht, sie gar nicht erst zu protokollieren.
+Das Konzept ist für `python -m wpanalyse.monitor`, `python -m wpanalyse.ha_monitor`,
+`python -m wpanalyse.run` und den Supervisor-Einstieg `wp-analyse/run.py` umgesetzt.
+Die Supervisor-App übergibt ihre konfigurierbare Logstufe über
+`WPANALYSE_LOG_LEVEL`. Bei einem lokalen Start aus VS Code ist `stdout` im integrierten
+Terminal sichtbar; der VS-Code-Debugger kann dafür auf `integratedTerminal`
+konfiguriert werden und `WPANALYSE_LOG_LEVEL` über seine Umgebungsvariablen setzen.
 
-Dieses Konzept gilt für `python -m wpanalyse.monitor`, `python -m wpanalyse.ha_monitor`,
-`python -m wpanalyse.run` und den Supervisor-Einstieg `wp-analyse/run.py`. Alle nutzen
-`wpanalyse.logging_config.konfiguriere_logging`; die Supervisor-App übergibt ihre
-konfigurierbare Logstufe über `WPANALYSE_LOG_LEVEL`. Bei einem lokalen Start aus VS Code
-ist `stdout` im integrierten Terminal sichtbar; der VS-Code-Debugger kann dafür auf
-`integratedTerminal` konfiguriert werden und `WPANALYSE_LOG_LEVEL` über seine
-Umgebungsvariablen setzen.
+Die oben beschriebene GUI-Steuerung ist das Zielkonzept für das Streamlit-Dashboard;
+sie ist im aktuellen Dashboard noch nicht vorhanden. Dessen Sidebar enthält derzeit
+Datenquelle, Live-Host, Live-Port und Zeitraum. Änderungen an der GUI-Steuerung dürfen
+nicht die Einstellungen anderer Prozesse verändern; innerhalb eines Dashboard-Prozesses
+ist die Einstellung ausdrücklich prozessweit.
+
+`INFO` beschreibt reguläre Start-, Abschluss- und Verarbeitungsschritte, `WARNING`
+behebbare Probleme und `ERROR` fehlgeschlagene Vorgänge. Fehlerlogs bleiben auch bei
+ausgeschalteten Anwendungslogs aktiv. Sie enthalten nur eine sichere Zusammenfassung:
+ungeprüfter externer Fehlertext, Exception-Details und Tracebacks werden nicht
+ausgegeben. Das Dashboard kann einen Fehler zusätzlich nutzerverständlich in der
+Oberfläche anzeigen; diese Anzeige ist unabhängig von der Logstufe. Zugangsdaten
+(insbesondere `HA_TOKEN`), vollständige Konfigurationswerte und Rohantworten gehören
+nie in Logs. Redigierung ist zusätzliche Absicherung und ersetzt nicht, sensible
+Inhalte gar nicht erst zu protokollieren.
 
 ## Live-Datenfluss
 ```
@@ -133,29 +183,6 @@ noch das Altschema `messwerte(zeit_ns, daten)` statt des relationalen Zielschema
 Schema-Migration wird beim Initialisieren automatisch ausgeführt.
 Der Live-Reglerzugriff über das Streamlit-Dashboard wurde am selben Tag erfolgreich
 geprüft; Dauerbetrieb ist nicht validiert.
-
-## Logging
-
-Alle Prozess-Einstiege (`python -m wpanalyse.run`, `python -m wpanalyse.ha_monitor`,
-`python -m wpanalyse.monitor` und die Supervisor-App) verwenden dasselbe Logging-Konzept:
-
-- Standardstufe ist `INFO`; `DEBUG` wird über `WPANALYSE_LOG_LEVEL=DEBUG` aktiviert.
-  Die Einstellung gilt für den gesamten Prozess und wird am Einstieg konfiguriert,
-  nicht in Analysefunktionen.
-- `INFO` beschreibt reguläre Start-, Abschluss- und Verarbeitungsschritte,
-  `WARNING` behebbare Probleme und `ERROR` fehlgeschlagene Vorgänge. `DEBUG` darf
-  zusätzliche Diagnosen enthalten, aber keine sensiblen Daten.
-- Die Ausgabe geht nach `stdout`, mit Zeitstempel und Log-Stufe. Im Home-Assistant-App-
-  Betrieb werden diese Container-Ausgaben im Supervisor unter den App-Logs angezeigt.
-- Zugangsdaten wie `HA_TOKEN` und vollständige Konfigurationswerte werden nie geloggt.
-  Fehler aus externen Bibliotheken werden nur mit einer sicheren Zusammenfassung
-  protokolliert, insbesondere ohne ungeprüften Fehlertext oder Traceback, der
-  Zugangsdaten enthalten könnte.
-
-Die gemeinsame Implementierung liegt in `wpanalyse.logging_config` und stellt die
-Schnittstelle `konfiguriere_logging(stufe: str | None = None) -> None` bereit.
-Sensible Umgebungsvariablen werden vor der Ausgabe redigiert; Exception- und Stack-
-Tracebacks werden durch eine sichere Fehlerzusammenfassung ersetzt.
 
 ## Home-Assistant-App
 
