@@ -48,7 +48,7 @@ def lade_live_daten(speicher: SQLiteSpeicher, stunden: int) -> pd.DataFrame:
     return speicher.lese(bis - pd.Timedelta(hours=stunden, minutes=1), bis)
 
 
-def frage_regler_ab(speicher: SQLiteSpeicher, host: str, intervall_s: float) -> str:
+def frage_regler_ab(speicher: SQLiteSpeicher, host: str, port: int, intervall_s: float) -> str:
     """Fragt den Regler ab, wenn die letzte Messung älter als das Intervall ist.
 
     Mehrere offene Browser-Tabs lösen so keine doppelten Abfragen aus.
@@ -61,7 +61,7 @@ def frage_regler_ab(speicher: SQLiteSpeicher, host: str, intervall_s: float) -> 
     letzte = lade_live_daten(speicher, 1)
     if not letzte.empty and (jetzt - letzte.index[-1]).total_seconds() < intervall_s - 5:
         return f"Letzte Messung {letzte.index[-1].tz_convert('Europe/Berlin'):%H:%M:%S}"
-    adapter = LuxtronikAdapter(LuxtronikConfig(host=host))
+    adapter = LuxtronikAdapter(LuxtronikConfig(host=host, port=port))
     ok = Monitor(adapter, speicher, intervall_s).einmal()
     return "Abfrage erfolgreich" if ok else "Abfrage fehlgeschlagen (Regler erreichbar?)"
 
@@ -258,13 +258,14 @@ def main() -> None:
 
     vorgabe = LuxtronikConfig.aus_umgebung()
     host = st.sidebar.text_input("Luxtronik-Host", vorgabe.host or "192.168.178.116")
+    port = st.sidebar.number_input("Luxtronik-Port", min_value=1, max_value=65535, value=vorgabe.port, step=1)
     stunden = st.sidebar.slider("Zeitraum (Stunden)", 1, 72, 6)
     intervall_s = vorgabe.abfrage_intervall_s
 
     @st.fragment(run_every=intervall_s)
     def live() -> None:
         with SQLiteSpeicher(DB_PFAD) as speicher:
-            status = frage_regler_ab(speicher, host, intervall_s)
+            status = frage_regler_ab(speicher, host, int(port), intervall_s)
             df = lade_live_daten(speicher, stunden)
         st.caption(f"Live-Betrieb, Abfrage alle {intervall_s:.0f} s (nur lesend). {status}")
         if df.empty:
