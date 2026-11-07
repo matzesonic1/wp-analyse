@@ -40,7 +40,7 @@ class Monitor:
                 log.warning("Keine Messwerte empfangen, nächster Versuch im Intervall")
                 return False
             self._speicher.speichern(df)
-        except Exception:
+        except Exception:  # noqa: BLE001 - Abfrage- und Speicherfehler müssen den Poller nicht beenden.
             log.error("Abfrage fehlgeschlagen, nächster Versuch im Intervall")
             return False
         log.info("Messung gespeichert: %s", df.index[0].isoformat())

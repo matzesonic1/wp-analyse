@@ -1,7 +1,7 @@
 """Tests für LuxtronikAdapter und Monitor mit einem gefälschten Regler."""
 
-from types import SimpleNamespace
 import sys
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest

@@ -35,9 +35,7 @@ def test_log_filter_redigiert_token_und_entfernt_traceback(caplog, monkeypatch):
         raise RuntimeError(f"Fehler mit {token}")
     except RuntimeError:
         with caplog.at_level(logging.ERROR, logger="wpanalyse.ha_monitor"):
-            logging.getLogger("wpanalyse.ha_monitor").error(
-                "Abfrage fehlgeschlagen: %s", token, exc_info=True
-            )
+            logging.getLogger("wpanalyse.ha_monitor").exception("Abfrage fehlgeschlagen: %s", token)
 
     assert token not in caplog.text
     assert "[GEHEIM]" in caplog.text

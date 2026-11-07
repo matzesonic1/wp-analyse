@@ -36,7 +36,7 @@ def konfiguriere_logging(stufe: str | None = None) -> None:
     name = stufe if stufe is not None else os.environ.get("WPANALYSE_LOG_LEVEL", "INFO")
     level = logging.getLevelName(name.upper())
     if not isinstance(level, int):
-        raise ValueError("Ungültige Log-Stufe")
+        raise ValueError("Ungültige Log-Stufe")  # noqa: TRY004 - Der übergebene Typ ist korrekt.
 
     root = logging.getLogger()
     root.setLevel(level)
