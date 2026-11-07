@@ -35,6 +35,9 @@ class Monitor:
         """Fragt einmal ab und speichert; Fehler werden geloggt und nicht geworfen."""
         try:
             df = self._adapter.aktuell()
+            if df.empty:
+                log.warning("Keine Messwerte empfangen, nächster Versuch im Intervall")
+                return False
             self._speicher.speichern(df)
         except Exception:
             log.exception("Abfrage fehlgeschlagen, nächster Versuch im Intervall")

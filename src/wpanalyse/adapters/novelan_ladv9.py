@@ -2,8 +2,10 @@
 
 import json
 import os
+import time
 from collections.abc import Mapping
 from datetime import datetime
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -37,6 +39,8 @@ _ZAHL_FELDER = {
     "waerme_kwh",
     "warmwasser_c",
 }
+_ANFRAGE_VERSUCHE = 3
+_BACKOFF_SEKUNDEN = 1.0
 
 
 class NovelanLadv9Adapter(DatenAdapter):
@@ -103,10 +107,20 @@ class NovelanLadv9Adapter(DatenAdapter):
         )
 
     def _anfrage(self, url: str) -> list:
-        """Sendet eine authentifizierte GET-Anfrage und dekodiert die JSON-Antwort."""
+        """Sendet GET-Anfragen mit begrenzten Wiederholungen bei Netzwerkfehlern."""
         anfrage = Request(url, headers={"Authorization": "Bearer " + self.token})
-        with urlopen(anfrage, timeout=self.timeout) as antwort:
-            return json.load(antwort)
+        for versuch in range(_ANFRAGE_VERSUCHE):
+            try:
+                with urlopen(anfrage, timeout=self.timeout) as antwort:
+                    return json.load(antwort)
+            except HTTPError as exc:
+                if exc.code < 500 or versuch == _ANFRAGE_VERSUCHE - 1:
+                    raise
+            except (URLError, TimeoutError, ConnectionError):
+                if versuch == _ANFRAGE_VERSUCHE - 1:
+                    raise
+            time.sleep(_BACKOFF_SEKUNDEN * (2**versuch))
+        raise RuntimeError("Home-Assistant-Anfrage endete ohne Antwort.")
 
     def _als_dataframe(self, zustaende) -> pd.DataFrame:
         """Ordnet API-Zustände nach Zeit und Projektfeld zu einem DataFrame.
