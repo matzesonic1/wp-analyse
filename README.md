@@ -52,6 +52,22 @@ Das Dashboard hat zwei Datenquellen (Seitenleiste): **Live-Betrieb** (Abfrage al
 **Simulation**. Es zeigt aktuelle Werte, Temperatur-, Leistungs- und Laufzeitverläufe,
 Verdichterstarts pro Tag und gesamt, die Bewertung von Anläufen zur Betriebszeit, die
 Arbeitszahl über der Außentemperatur sowie eine freie Auswahl aller gespeicherten Messwerte.
+Die Ansicht **Heißgas im Betriebskontext** zeigt den Temperaturverlauf zusammen mit Außen-,
+Vor- und Rücklauf; Punkte markieren die einzelnen Messwerte. Beim Darüberfahren erscheinen
+Messwert, Zeitpunkt, Betriebsart und Verdichterzustand; darunter zeigt ein Zeitstreifen die
+Betriebsart pro Messung. Dazu gibt es eine Tabelle mit Verdichterzustand, Laufzeit und Betriebsart.
+Fehlende Messwerte und Messlücken sind zu beachten; die Ansicht stellt keine Defektdiagnose
+und verwendet keine unbestätigten Herstellergrenzen.
+
+Im Live-Betrieb lässt sich zwischen einem mitlaufenden Zeitraum von 1–72 Stunden und einem
+festen Zeitraum mit Datum und Uhrzeit wählen. Die Eingaben gelten in **Europe/Berlin**
+(inklusive Sommerzeit); der Beginn ist eingeschlossen, das Ende ausgeschlossen. Nicht
+existierende oder doppelte Uhrzeiten bei der Zeitumstellung werden abgelehnt. Alle Diagramme,
+Kennzahlen und Tabellen beziehen sich auf die Auswahl; historische Kacheln zeigen die letzte
+Messung im ausgewählten Zeitraum, nicht notwendigerweise den aktuellen Zustand. Gesamtzähler
+bleiben Zählerstände bis zu dieser Messung und sind keine Zuwächse im Zeitraum. Die
+Reglerabfrage läuft auch bei festem Zeitraum während einer aktiven Browser-Sitzung weiter.
+Tagesauswertungen verwenden UTC-Tage, und unvollständige Tage bzw. Messlücken sind zu beachten.
 
 Die Sidebar-Option **Anwendungslogs** und die Logstufe `DEBUG` aktivieren Ablaufdiagnosen
 im Terminal des Dashboard-Prozesses. DEBUG-Zeilen enthalten die Prozess-ID (`pid`),

@@ -2,6 +2,9 @@
 
 import logging
 import time
+from datetime import UTC, date, datetime
+from datetime import time as uhrzeit
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -54,24 +57,56 @@ def berechne_az_nach_aussentemperatur(df: pd.DataFrame) -> pd.DataFrame:
 
 
 DB_PFAD = "data/wp.sqlite"
+ZEITZONE = ZoneInfo("Europe/Berlin")
 
 
-def lade_live_daten(speicher: SQLiteSpeicher, stunden: int) -> pd.DataFrame:
-    """Liest die letzten ``stunden`` Stunden aus der Datenbank."""
-    bis = pd.Timestamp.now(tz="UTC") + pd.Timedelta(minutes=1)
+def lade_zeitraum_daten(speicher: SQLiteSpeicher, von: datetime, bis: datetime) -> pd.DataFrame:
+    """Liest Messwerte im halboffenen Zeitraum aus der Datenbank."""
     start = time.monotonic()
     try:
-        daten = speicher.lese(bis - pd.Timedelta(hours=stunden, minutes=1), bis)
+        daten = speicher.lese(von, bis)
     except Exception:
         log.debug("datenbank vorgang=lesen ergebnis=fehler dauer_ms=%.0f", (time.monotonic() - start) * 1000)
         diagnose_gedrosselt(log, logging.ERROR, "datenbank lesen fehlgeschlagen", "datenbank")
         raise
     log.debug(
-        "datenbank vorgang=lesen ergebnis=ok zeilen=%d zeitraum_h=%d dauer_ms=%.0f",
-        len(daten), stunden, (time.monotonic() - start) * 1000,
+        "datenbank vorgang=lesen ergebnis=ok zeilen=%d dauer_ms=%.0f",
+        len(daten), (time.monotonic() - start) * 1000,
     )
     diagnose_wiederhergestellt(log, logging.ERROR, "datenbank lesen fehlgeschlagen")
     return daten
+
+
+def lade_live_daten(speicher: SQLiteSpeicher, stunden: int) -> pd.DataFrame:
+    """Liest die letzten ``stunden`` Stunden aus der Datenbank."""
+    bis = pd.Timestamp.now(tz="UTC") + pd.Timedelta(minutes=1)
+    return lade_zeitraum_daten(speicher, bis - pd.Timedelta(hours=stunden, minutes=1), bis)
+
+
+def lokaler_zeitpunkt_utc(tag: date, zeit: uhrzeit) -> datetime:
+    """Wandelt eine eindeutige Berliner Ortszeit in UTC um."""
+    lokal = datetime.combine(tag, zeit)
+    kandidaten = set()
+    for fold in (0, 1):
+        utc = lokal.replace(tzinfo=ZEITZONE, fold=fold).astimezone(UTC)
+        if utc.astimezone(ZEITZONE).replace(tzinfo=None) == lokal:
+            kandidaten.add(utc)
+    if not kandidaten:
+        raise ValueError("Diese Uhrzeit existiert wegen der Sommerzeitumstellung nicht.")
+    if len(kandidaten) > 1:
+        raise ValueError("Diese Uhrzeit ist wegen der Zeitumstellung doppelt vorhanden; bitte anders wählen.")
+    return kandidaten.pop()
+
+
+def fester_zeitraum_utc(
+    start_tag: date, start_zeit: uhrzeit, ende_tag: date, ende_zeit: uhrzeit
+) -> tuple[datetime, datetime]:
+    """Prüft die Grenzen und liefert einen halboffenen UTC-Zeitraum."""
+    von = lokaler_zeitpunkt_utc(start_tag, start_zeit)
+    bis = lokaler_zeitpunkt_utc(ende_tag, ende_zeit)
+    if von >= bis:
+        raise ValueError("Das Ende muss nach dem Beginn liegen.")
+    return von, bis
 
 
 def frage_regler_ab(speicher: SQLiteSpeicher, host: str, port: int, intervall_s: float) -> str:
@@ -100,7 +135,7 @@ def frage_regler_ab(speicher: SQLiteSpeicher, host: str, port: int, intervall_s:
     return "Abfrage erfolgreich" if ok else "Abfrage fehlgeschlagen (Regler erreichbar?)"
 
 
-def zeige_aktuelle_werte(st, df: pd.DataFrame) -> None:
+def zeige_aktuelle_werte(st, df: pd.DataFrame, historisch: bool = False) -> None:
     """Zeigt die jüngste Messung als Kennzahlen, soweit die Spalten vorhanden sind."""
     letzte = df.iloc[-1]
 
@@ -149,7 +184,8 @@ def zeige_aktuelle_werte(st, df: pd.DataFrame) -> None:
         ("Abtauzeit", wert("abtauung_zeit_s"), "{:.0f} s"),
     ]
     kacheln = [k for k in kacheln if k[1] is not None]
-    st.subheader(f"Aktuelle Werte ({df.index[-1].tz_convert('Europe/Berlin'):%d.%m. %H:%M:%S})")
+    titel = "Letzte Werte im Zeitraum" if historisch else "Aktuelle Werte"
+    st.subheader(f"{titel} ({df.index[-1].tz_convert('Europe/Berlin'):%d.%m. %H:%M:%S})")
     for beginn in range(0, len(kacheln), 6):
         spalten = st.columns(6)
         for spalte, (name, inhalt, format_) in zip(spalten, kacheln[beginn : beginn + 6], strict=False):
@@ -191,21 +227,28 @@ def zeige_freie_auswahl(st, df: pd.DataFrame) -> None:
             st.line_chart(daten[[spalte]])
 
 
-def zeige_verdichter_bewertung(st, df: pd.DataFrame) -> None:
+def zeige_verdichter_bewertung(st, df: pd.DataFrame, historisch: bool = False) -> None:
     """Zeigt Anläufe im Verhältnis zur Betriebszeit und die Plausibilität zum Verdichtertausch."""
     if not {"verdichter_starts_zaehler", "verdichter_betriebszeit_s"} <= set(df.columns):
         return
     letzte = df[["verdichter_starts_zaehler", "verdichter_betriebszeit_s"]].dropna()
     if letzte.empty:
         return
+    config = VerdichterConfig()
+    messzeit = letzte.index[-1]
+    if historisch and messzeit < pd.Timestamp(config.tausch_fruehestens, tz="UTC"):
+        st.info("Verdichterbewertung nicht verfügbar: Die letzte Messung liegt vor dem frühesten Tauschtermin.")
+        return
     ergebnis = bewerte_verdichter(
         int(letzte["verdichter_starts_zaehler"].iloc[-1]),
         float(letzte["verdichter_betriebszeit_s"].iloc[-1]),
-        pd.Timestamp.now(tz="UTC"),
-        VerdichterConfig(),
+        messzeit if historisch else pd.Timestamp.now(tz="UTC"),
+        config,
         df,
     )
     st.subheader("Verdichter: Anläufe zu Betriebszeit")
+    if historisch:
+        st.caption("Zählerstände bis zur letzten Messung; nur Starts/h beziehen sich auf den gewählten Zeitraum.")
     spalten = st.columns(4)
     spalten[0].metric("Starts (Zähler)", f"{ergebnis.starts:,.0f}")
     spalten[1].metric("Betriebszeit", f"{ergebnis.betriebszeit_h:,.0f} h")
@@ -219,12 +262,84 @@ def zeige_verdichter_bewertung(st, df: pd.DataFrame) -> None:
         st.success("Anläufe und Betriebszeit passen zusammen.")
 
 
-def zeige_diagramme(st, df: pd.DataFrame) -> None:
+def zeige_heissgas_verlauf(st, df: pd.DataFrame) -> None:
+    """Zeigt Heißgas und den zeitgleichen Betriebskontext ohne Defektdiagnose."""
+    st.subheader("Heißgas im Betriebskontext")
+    st.caption(
+        "Ein hoher Heißgaswert allein beweist keinen Verdichterschaden. "
+        "Betriebsart, Laufzeit und Temperaturen gemeinsam betrachten; Herstellergrenzen sind nicht hinterlegt."
+    )
+    if "heissgas_c" not in df or pd.to_numeric(df["heissgas_c"], errors="coerce").notna().sum() == 0:
+        st.info("Keine Heißgas-Messwerte im gewählten Zeitraum vorhanden.")
+        return
+
+    temperaturfelder = {
+        "heissgas_c": "Heißgas",
+        "aussen_c": "Außen",
+        "vorlauf_c": "Vorlauf",
+        "ruecklauf_c": "Rücklauf",
+    }
+    verfuegbar = [
+        feld for feld in temperaturfelder
+        if feld in df and pd.to_numeric(df[feld], errors="coerce").notna().any()
+    ]
+    import altair as alt
+
+    temperaturen = df[verfuegbar].apply(pd.to_numeric, errors="coerce").rename(columns=temperaturfelder)
+    betriebsart = df["betriebsart"] if "betriebsart" in df else pd.Series(None, index=df.index, dtype="object")
+    temperaturen["Betriebsart"] = betriebsart.replace("", pd.NA).fillna("unbekannt")
+    verdichter = df["verdichter_an"] if "verdichter_an" in df else pd.Series(None, index=df.index, dtype="object")
+    temperaturen["Verdichter"] = verdichter.map({True: "an", False: "aus"}).fillna("unbekannt")
+    chart_daten = temperaturen.rename_axis("zeit").reset_index().melt(
+        id_vars=["zeit", "Betriebsart", "Verdichter"], var_name="messreihe", value_name="temperatur"
+    )
+    basis = alt.Chart(chart_daten).encode(
+        x=alt.X("zeit:T", title="Zeit"),
+        y=alt.Y("temperatur:Q", title="Temperatur (°C)", scale=alt.Scale(zero=False)),
+        color=alt.Color("messreihe:N", title="Messreihe"),
+    )
+    linien = basis.mark_line()
+    punkte = basis.mark_circle(size=20)
+    hover = basis.mark_circle(size=160, opacity=0.001).encode(
+        tooltip=[
+            alt.Tooltip("zeit:T", title="Zeitpunkt", format="%d.%m.%Y %H:%M:%S"),
+            alt.Tooltip("messreihe:N", title="Messreihe"),
+            alt.Tooltip("temperatur:Q", title="Temperatur (°C)", format=".1f"),
+            alt.Tooltip("Betriebsart:N", title="Betriebsart"),
+            alt.Tooltip("Verdichter:N", title="Verdichter"),
+        ],
+    )
+    modus_daten = temperaturen[["Betriebsart", "Verdichter"]].rename_axis("zeit").reset_index()
+    modus = alt.Chart(modus_daten).mark_point(filled=True, size=35).encode(
+        x=alt.X("zeit:T", title="Zeit"),
+        y=alt.Y("Betriebsart:N", title="Betriebsart"),
+        tooltip=[
+            alt.Tooltip("zeit:T", title="Zeitpunkt", format="%d.%m.%Y %H:%M:%S"),
+            alt.Tooltip("Betriebsart:N", title="Betriebsart"),
+            alt.Tooltip("Verdichter:N", title="Verdichter"),
+        ],
+    ).properties(height=100)
+    st.altair_chart(alt.vconcat(linien + punkte + hover, modus).resolve_scale(x="shared"), width="stretch")
+    st.caption("Messlücken und fehlende Werte beachten; Linien können Messpunkte über Lücken verbinden.")
+
+    kontext = [
+        feld for feld in (
+            "heissgas_c", "verdichter_an", "verdichter_laufzeit_s",
+            "betriebsart", "aussen_c", "vorlauf_c", "ruecklauf_c",
+        )
+        if feld in df
+    ]
+    st.caption("Zeitgleiche Messwerte; fehlende Werte bleiben leer. Laufzeit in Sekunden.")
+    st.dataframe(df[kontext].sort_index(ascending=False))
+
+
+def zeige_diagramme(st, df: pd.DataFrame, historisch: bool = False) -> None:
     """Zeichnet alle Dashboard-Diagramme für die vorhandenen Spalten."""
     if df.empty:
         return
-    zeige_aktuelle_werte(st, df)
-    zeige_verdichter_bewertung(st, df)
+    zeige_aktuelle_werte(st, df, historisch=historisch)
+    zeige_verdichter_bewertung(st, df, historisch=historisch)
+    zeige_heissgas_verlauf(st, df)
 
     st.subheader("Temperaturen")
     spalten = [s for s in ("vorlauf_c", "ruecklauf_c", "aussen_c", "warmwasser_c") if s in df]
@@ -323,7 +438,26 @@ def main() -> None:
     vorgabe = LuxtronikConfig.aus_umgebung()
     host = st.sidebar.text_input("Luxtronik-Host", vorgabe.host or "192.168.178.116")
     port = st.sidebar.number_input("Luxtronik-Port", min_value=1, max_value=65535, value=vorgabe.port, step=1)
-    stunden = st.sidebar.slider("Zeitraum (Stunden)", 1, 72, 6)
+    modus = st.sidebar.radio("Zeitraumauswahl", ["Letzte Stunden", "Fester Zeitraum"])
+    stunden = 6
+    grenzen = None
+    if modus == "Letzte Stunden":
+        stunden = st.sidebar.slider("Zeitraum (Stunden)", 1, 72, 6)
+    else:
+        if "_zeitraum_vorgabe_ende" not in st.session_state:
+            st.session_state["_zeitraum_vorgabe_ende"] = datetime.now(ZEITZONE).replace(second=0, microsecond=0)
+        jetzt = st.session_state["_zeitraum_vorgabe_ende"]
+        beginn = (jetzt.astimezone(UTC) - pd.Timedelta(hours=6)).astimezone(ZEITZONE)
+        st.sidebar.caption("Ortszeit Europe/Berlin. Beginn inklusive, Ende exklusiv.")
+        start_tag = st.sidebar.date_input(
+            "Beginn – Datum", beginn.date(), min_value=date(1970, 1, 1), max_value=date(2100, 12, 31)
+        )
+        start_zeit = st.sidebar.time_input("Beginn – Uhrzeit", beginn.time())
+        ende_tag = st.sidebar.date_input(
+            "Ende – Datum", jetzt.date(), min_value=date(1970, 1, 1), max_value=date(2100, 12, 31)
+        )
+        ende_zeit = st.sidebar.time_input("Ende – Uhrzeit", jetzt.time())
+        grenzen = (start_tag, start_zeit, ende_tag, ende_zeit)
     intervall_s = vorgabe.abfrage_intervall_s
 
     @st.fragment(run_every=intervall_s)
@@ -339,12 +473,20 @@ def main() -> None:
         diagnose_wiederhergestellt(log, logging.ERROR, "datenbank oeffnen fehlgeschlagen")
         with speicher:
             status = frage_regler_ab(speicher, host, int(port), intervall_s)
-            df = lade_live_daten(speicher, stunden)
-        st.caption(f"Live-Betrieb, Abfrage alle {intervall_s:.0f} s (nur lesend). {status}")
+            st.caption(f"Live-Betrieb, Abfrage alle {intervall_s:.0f} s (nur lesend). {status}")
+            if grenzen is None:
+                df = lade_live_daten(speicher, stunden)
+            else:
+                try:
+                    von, bis = fester_zeitraum_utc(*grenzen)
+                except ValueError as fehler:
+                    st.error(str(fehler))
+                    return
+                df = lade_zeitraum_daten(speicher, von, bis)
         if df.empty:
-            st.info("Noch keine Messwerte vorhanden.")
+            st.info("Keine Messwerte im ausgewählten Zeitraum vorhanden.")
             return
-        zeige_diagramme(st, df)
+        zeige_diagramme(st, df, historisch=grenzen is not None)
 
     live()
 
