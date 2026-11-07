@@ -36,6 +36,30 @@ class Messwert:
     raeume_c: dict[str, float] = field(default_factory=dict)  # z. B. {"wohnzimmer": 20.8}
 
 
+@dataclass(frozen=True)
+class Stoerung:
+    """Unverändert übernommener Störungseintrag einer Anlage."""
+
+    ereignis_id: str
+    beginn: datetime
+    ende: datetime | None = None
+    fehlercode: str | None = None
+    beschreibung_roh: str | None = None
+    quelle: str | None = None
+
+
+@dataclass(frozen=True)
+class WartungReparatur:
+    """Dokumentierter Wartungs- oder Reparatureintrag."""
+
+    ereignis_id: str
+    zeit: datetime
+    massnahme: str
+    komponente: str | None = None
+    bestaetigter_fehler: str | None = None
+    quelle: str | None = None
+
+
 @dataclass
 class Befund:
     """Verständlich formulierter Befund aus einer Regel oder Analyse.
