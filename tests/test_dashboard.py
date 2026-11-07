@@ -1,6 +1,10 @@
-import pandas as pd
+import logging
+import sys
 
-from wpanalyse import dashboard
+import pandas as pd
+import pytest
+
+from wpanalyse import dashboard, logging_config
 from wpanalyse.dashboard import (
     berechne_az_nach_aussentemperatur,
     berechne_starts_pro_tag,
@@ -8,6 +12,56 @@ from wpanalyse.dashboard import (
     numerische_spalten,
 )
 from wpanalyse.simulation import simuliere
+
+
+@pytest.fixture
+def _dashboard_logging_zuruecksetzen(monkeypatch):
+    logger = logging.getLogger("wpanalyse")
+    stufe = logger.level
+    weiterreichen = logger.propagate
+    handler = list(logger.handlers)
+    handler_stufen = {eintrag: eintrag.level for eintrag in handler}
+    monkeypatch.setattr(logging_config, "_DASHBOARD_LOGGING_AKTIV", True)
+    monkeypatch.setattr(logging_config, "_DASHBOARD_LOGGING_STUFE", "INFO")
+    yield
+    for eintrag in list(logger.handlers):
+        if eintrag not in handler:
+            logger.removeHandler(eintrag)
+            eintrag.close()
+    logger.setLevel(stufe)
+    logger.propagate = weiterreichen
+    for eintrag, handler_stufe in handler_stufen.items():
+        eintrag.setLevel(handler_stufe)
+
+
+class _StreamlitFake:
+    def __init__(self):
+        self.session_state = {}
+        self.sidebar = _SidebarFake(self)
+
+    def set_page_config(self, **kwargs):
+        pass
+
+    def title(self, text):
+        pass
+
+    def caption(self, text):
+        pass
+
+
+class _SidebarFake:
+    def __init__(self, st):
+        self.st = st
+        self.widgets = {}
+
+    def checkbox(self, label, **kwargs):
+        self.widgets[label] = kwargs
+
+    def selectbox(self, label, options, **kwargs):
+        self.widgets[label] = {**kwargs, "options": options}
+
+    def radio(self, label, options):
+        return "Simulation"
 
 
 def test_reglerabfrage_uebergibt_host_und_port_an_adapter(monkeypatch):
@@ -97,3 +151,27 @@ def test_simulationsdaten_enthalten_alle_dashboard_trends():
     assert (starts > 0).all()
     assert list(az_nach_aussen.columns) == ["aussen_c", "az"]
     assert len(az_nach_aussen) == 2
+
+
+def test_logging_steuerung_bleibt_ueber_dashboard_reruns_prozessweit(monkeypatch, _dashboard_logging_zuruecksetzen):
+    erster_lauf = _StreamlitFake()
+    monkeypatch.setitem(sys.modules, "streamlit", erster_lauf)
+    monkeypatch.setattr(dashboard, "zeige_diagramme", lambda st, df: None)
+    monkeypatch.setattr(dashboard, "simuliere", lambda tage: pd.DataFrame())
+    logging_config.setze_dashboard_logging(aktiviert=True, stufe="WARNING")
+
+    dashboard.main()
+
+    assert erster_lauf.session_state[dashboard._LOGGING_AKTIV_SCHLUESSEL] is True
+    assert erster_lauf.session_state[dashboard._LOGGING_STUFE_SCHLUESSEL] == "WARNING"
+    steuerung = erster_lauf.sidebar.widgets["Anwendungslogs"]
+    erster_lauf.session_state[steuerung["key"]] = False
+    steuerung["on_change"](*steuerung["args"])
+    assert logging_config.dashboard_logging_einstellungen() == (False, "WARNING")
+
+    zweiter_lauf = _StreamlitFake()
+    monkeypatch.setitem(sys.modules, "streamlit", zweiter_lauf)
+    dashboard.main()
+
+    assert zweiter_lauf.session_state[dashboard._LOGGING_AKTIV_SCHLUESSEL] is False
+    assert zweiter_lauf.sidebar.widgets["Logstufe"]["disabled"] is True

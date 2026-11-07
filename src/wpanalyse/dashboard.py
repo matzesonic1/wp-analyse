@@ -4,8 +4,12 @@ import pandas as pd
 
 from wpanalyse.analyse.verdichter import bewerte_verdichter
 from wpanalyse.config import LuxtronikConfig, VerdichterConfig
+from wpanalyse.logging_config import dashboard_logging_einstellungen, setze_dashboard_logging
 from wpanalyse.simulation import simuliere
 from wpanalyse.speicher.sqlite import SQLiteSpeicher
+
+_LOGGING_AKTIV_SCHLUESSEL = "anwendungslogs_aktiv"
+_LOGGING_STUFE_SCHLUESSEL = "anwendungslogs_stufe"
 
 
 def berechne_starts_pro_tag(df: pd.DataFrame) -> pd.Series:
@@ -243,6 +247,34 @@ def zeige_diagramme(st, df: pd.DataFrame) -> None:
         st.dataframe(df.sort_index(ascending=False).astype(str))
 
 
+def _aendere_logging(st, einstellung: str) -> None:
+    if einstellung == "aktiv":
+        setze_dashboard_logging(aktiviert=st.session_state[_LOGGING_AKTIV_SCHLUESSEL])
+    else:
+        setze_dashboard_logging(stufe=st.session_state[_LOGGING_STUFE_SCHLUESSEL])
+
+
+def _zeige_logging_steuerung(st) -> None:
+    """Zeigt und synchronisiert die prozessweiten Logging-Einstellungen."""
+    aktiviert, stufe = dashboard_logging_einstellungen()
+    st.session_state[_LOGGING_AKTIV_SCHLUESSEL] = aktiviert
+    st.session_state[_LOGGING_STUFE_SCHLUESSEL] = stufe
+    st.sidebar.checkbox(
+        "Anwendungslogs",
+        key=_LOGGING_AKTIV_SCHLUESSEL,
+        on_change=_aendere_logging,
+        args=(st, "aktiv"),
+    )
+    st.sidebar.selectbox(
+        "Logstufe",
+        ("DEBUG", "INFO", "WARNING", "ERROR"),
+        key=_LOGGING_STUFE_SCHLUESSEL,
+        disabled=not aktiviert,
+        on_change=_aendere_logging,
+        args=(st, "stufe"),
+    )
+
+
 def main() -> None:
     """Startet das Dashboard mit Simulation oder Live-Betrieb (Abfrage alle 60 s)."""
     import streamlit as st
@@ -250,6 +282,7 @@ def main() -> None:
     st.set_page_config(page_title="WP-Analyse", layout="wide")
     st.title("Wärmepumpen-Dashboard")
 
+    _zeige_logging_steuerung(st)
     quelle = st.sidebar.radio("Datenquelle", ["Live-Betrieb", "Simulation"])
     if quelle == "Simulation":
         st.caption("Simulierte Messdaten.")
