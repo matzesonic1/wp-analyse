@@ -93,7 +93,10 @@ aus Logs herauszufiltern ersetzt nicht, sie gar nicht erst zu protokollieren.
 Dieses Konzept gilt für `python -m wpanalyse.monitor`, `python -m wpanalyse.ha_monitor`,
 `python -m wpanalyse.run` und den Supervisor-Einstieg `wp-analyse/run.py`. Alle nutzen
 `wpanalyse.logging_config.konfiguriere_logging`; die Supervisor-App übergibt ihre
-konfigurierbare Logstufe über `WPANALYSE_LOG_LEVEL`.
+konfigurierbare Logstufe über `WPANALYSE_LOG_LEVEL`. Bei einem lokalen Start aus VS Code
+ist `stdout` im integrierten Terminal sichtbar; der VS-Code-Debugger kann dafür auf
+`integratedTerminal` konfiguriert werden und `WPANALYSE_LOG_LEVEL` über seine
+Umgebungsvariablen setzen.
 
 ## Live-Datenfluss
 ```

@@ -59,6 +59,12 @@ Die gemeinsame Konfiguration schreibt nach `stdout` und unterdrückt Zugangsdate
 unsichere Fehlerdetails und Tracebacks. Beim eigenständigen Betrieb wird die Stufe über
 `WPANALYSE_LOG_LEVEL` gesetzt, in der Supervisor-App über die Option **Log-Stufe**.
 
+Beim eigenständigen Start aus VS Code erscheinen die Logs im integrierten Terminal,
+sofern der Prozess dort gestartet wird. Für den Debugger kann in `.vscode/launch.json`
+`"console": "integratedTerminal"` und unter `"env"` beispielsweise
+`"WPANALYSE_LOG_LEVEL": "DEBUG"` gesetzt werden. Zugangsdaten sollten nicht in eine
+eingecheckte Launch-Konfiguration geschrieben werden.
+
 Die Raspberry-Pi-Unterstützung ist auf 64-Bit-Home-Assistant-OS (`aarch64`)
 ausgelegt. Zusammen mit `amd64` sind dies die in der App-Metadatei und im
 Build-Workflow eingetragenen Architekturen. `armv7`/32-Bit wird ausdrücklich
