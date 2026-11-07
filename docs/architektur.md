@@ -40,6 +40,36 @@ Die Statusangaben beziehen sich auf Code im Repository und die unten aufgeführt
 Live-Verifikation, nicht auf einen validierten Dauerbetrieb. Tests mit Fakes belegen
 keine reale Verbindung zum Regler oder zu Home Assistant.
 
+## Test- und CI-Konzept
+
+### Testebenen
+- **Unit-Tests:** reine Analysefunktionen und Datenverarbeitung mit kleinen, synthetischen
+  DataFrames. Grenzwerte, fehlende Werte und nicht auswertbare Kennzahlen werden explizit geprüft.
+- **Adapter- und Simulationstests:** synthetische oder gemockte Antworten prüfen Feldmapping,
+  UTC-Zeitstempel und Fehlerbehandlung. Sie belegen keinen Zugriff auf reale Geräte.
+- **Integrations-Tests:** Speicher- und Ablaufpfade verwenden temporäre SQLite-Datenbanken sowie
+  Fake-Adapter, Fake-Melder und kontrollierte Eingaben; kein echter Netzwerkzugriff.
+- **Manuelle Live-Prüfungen:** Regler, Home Assistant und App-Laufzeit bleiben separat zu
+  verifizieren und sind kein Bestandteil der CI.
+
+Neue Funktionen erhalten Tests mit synthetischen Daten; externe Systeme und Zugangsdaten sind
+für die Tests nicht erforderlich. Die Tests sollen reproduzierbar, zeitunabhängig und ohne
+Wartezeiten laufen. Der lokale Qualitätslauf besteht aus `ruff check .` und `pytest`.
+
+### CI-/Build-Abgrenzung
+
+**Geplant, noch nicht implementiert:** Ein GitHub-Actions-Workflow führt bei Pull Requests und
+Pushes auf `main` Ruff und pytest aus (Installation über `pip install -e ".[dev]"`, mindestens
+Python 3.11). Diese Qualitätschecks sollen als erforderliche Statusprüfung vor dem Merge
+konfiguriert werden. Der bestehende [`build-app.yaml`](../.github/workflows/build-app.yaml)
+bleibt für das Bauen und Veröffentlichen des Home-Assistant-Images zuständig und wird nicht
+durch Tests mit Live-Zugangsdaten ergänzt. Ein erfolgreicher Image-Build allein gilt nicht als
+Nachweis, dass Tests und Lint erfolgreich waren; die erforderliche Statusprüfung muss in den
+Repository-Einstellungen aktiviert werden.
+
+Die konkrete Workflow-Konfiguration und die abschließende Dokumentation der tatsächlich
+aktiven Checks sind als Issues 15 und 16 im [`Backlog`](backlog.md) geplant.
+
 ## Live-Datenfluss
 ```
  Luxtronik-Regler ──(TCP 8889, lesend)──► LuxtronikAdapter.aktuell()

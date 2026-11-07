@@ -28,6 +28,8 @@ Regler-/Home-Assistant-Zugriffe und App-Deployment sind damit nicht nachgewiesen
 | 12 | SQLite-Kernschema für Anlagen und Messwerte | datensammler | – | bestehender SQLite-Speicher | **fertig im Code** – Zieltabellen und Migration in `speicher/sqlite.py`; ein Migrationstest ist in `tests/test_sqlite_speicher.py` vorhanden, aber pytest wurde hier nicht ausgeführt (in der Projektumgebung nicht verfügbar). Die vorhandene `data/wp.sqlite` ist noch nicht migriert; vor dem ersten Öffnen mit dem aktuellen Speicher sichern. |
 | 13 | Raumtemperaturen relational speichern | datensammler | – | 12 | **teilweise** – relationale Raumwerte und Tests vorhanden; umgesetzt über `speichern`/`lese_raum_messwerte` statt der im Issue benannten Methoden `speichere_raeume`/`lese_raeume`; Live-DB noch im Altschema. |
 | 14 | Störungs- und Wartungsereignisse speichern | datensammler | – | 13 | **teilweise** – Speicherung, Bereichsabfragen und Tests vorhanden; die Methoden heißen `speichern_stoerung`/`speichern_wartung_reparatur` statt der im Issue benannten Schnittstellen. Tatsächliche Ereignisdaten und Live-Migration sind nicht nachgewiesen. |
+| 15 | CI-Qualitätschecks für Python | tester | – | – | **offen** – Ruff und pytest sollen als PR-/Main-Checks laufen; der bestehende Home-Assistant-Image-Build bleibt getrennt. |
+| 16 | Test- und CI-Dokumentation vervollständigen | architekt | – | 15 | **offen** – nach Umsetzung von Issue 15 aktive Workflows, Statusprüfungen und lokale Testbefehle dokumentieren. |
 
 #### Zusammenspiel der Teilbereiche
 
@@ -234,3 +236,27 @@ ununterbrochenen Betrieb noch die Verfügbarkeit einer externen Quelle oder Betr
 - Wartungsfälle enthalten dokumentierte Maßnahme und optional einen bestätigten Fehler getrennt von einer bloßen Störung.
 - Ereignisse sind über stabile IDs idempotent speicherbar und anhand Anlage/Zeitbereich abfragbar.
 **Testidee:** Je ein Störungs- und Wartungsereignis mit fehlenden optionalen Feldern speichern, erneut laden und unveränderte Codes, Texte, Zeitstempel und Anlagenzuordnung prüfen.
+
+### Issue 15 – CI-Qualitätschecks für Python
+**Ziel:** Bestehende Projektchecks für Lint und Tests automatisiert als Qualitäts-Gate ausführen.
+**Agent:** tester
+**Betroffene Dateien:** `.github/workflows/quality-checks.yaml`.
+**Schnittstelle:** GitHub-Actions-Workflow; keine Python-Schnittstelle.
+**Akzeptanzkriterien:**
+- Läuft für alle Pull Requests und Pushes auf `main`, damit Änderungen an Tests oder Konfiguration die Checks nicht durch Pfadfilter überspringen.
+- Installiert das Projekt samt Entwicklungsabhängigkeiten mit `pip install -e ".[dev]"` und führt `ruff check .` sowie `pytest` aus.
+- Prüft mindestens die unterstützte Mindestversion Python 3.11; Umgebungszugangsdaten und Netzwerkzugriff auf Wärmepumpen/Home Assistant sind nicht erforderlich.
+- Bleibt vom Workflow `.github/workflows/build-app.yaml` getrennt: dieser baut/veröffentlicht das Home-Assistant-Image, die neuen Jobs prüfen Codequalität.
+**Testidee:** Workflow-Lauf für einen Pull Request mit grünen Checks prüfen; danach lokal in einem Test-Branch jeweils einen Ruff-Fehler und einen fehlschlagenden Test einführen und sicherstellen, dass der zugehörige Job fehlschlägt. Keine Fehleränderung in den Hauptbranch übernehmen.
+
+### Issue 16 – Test- und CI-Dokumentation vervollständigen
+**Ziel:** Das Testkonzept und die tatsächlich aktiven CI-Prüfungen nach Umsetzung von Issue 15 nachvollziehbar dokumentieren.
+**Agent:** architekt
+**Betroffene Dateien:** `docs/architektur.md`, `README.md`.
+**Schnittstelle:** Keine Code-Schnittstelle.
+**Abhängigkeit:** Issue 15.
+**Akzeptanzkriterien:**
+- Beschreibt Testebenen und Grenzen (synthetische Daten/Fakes statt Live-Nachweis), lokale Installations- und Prüfkommandos sowie Workflow-Trigger und Jobs anhand der implementierten Konfiguration.
+- Erklärt, welche Statusprüfung vor Merge erforderlich ist und dass der Image-Build kein Ersatz für Test-/Lint-Ergebnisse ist.
+- Trennt umgesetzte Prüfungen klar von manuellen Live-/Deployment-Prüfungen und entfernt veraltete Aussagen über den Workflow-Status.
+**Testidee:** Dokumentierte Befehle mit `pyproject.toml` und Workflow vergleichen; Pfade und Workflow-Namen gegen die tatsächlich vorhandenen Dateien prüfen.
