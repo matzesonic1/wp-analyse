@@ -1,0 +1,86 @@
+name: agent-handoff
+
+# Kette mit den Custom Agents aus .github/agents:
+#   Issue -> Analyst baut -> Reviewer prueft -> (Aenderungen noetig: Analyst korrigiert) -> Tester ergaenzt Tests
+# Danach merged ein Mensch; mit dem Schliessen des Issues startet das naechste agent-queue-Issue.
+# Benoetigt das Secret AGENT_PAT (PAT des Repo-Besitzers mit Issues/Pull requests: write).
+
+on:
+  issues:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue-Nummer, die dem Analyst zugewiesen werden soll"
+        required: true
+  pull_request:
+    types: [ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+env:
+  GH_TOKEN: ${{ secrets.AGENT_PAT }}
+  GH_REPO: ${{ github.repository }}
+  MAX_FIX_ROUNDS: 2
+
+jobs:
+  assign-analyst:
+    if: >-
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'agent-queue')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Naechstes Issue der Queue dem Analyst zuweisen
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            next="${{ inputs.issue }}"
+          else
+            next=$(gh issue list --label agent-queue --state open \
+              --json number --jq 'sort_by(.number) | .[0].number // empty')
+          fi
+          [ -z "$next" ] && exit 0
+          gh api -X POST "repos/$GH_REPO/issues/$next/assignees" \
+            -f 'assignees[]=copilot-swe-agent[bot]' \
+            -f 'agent_assignment[custom_agent]=analyst' \
+            -f "agent_assignment[target_repo]=$GH_REPO" \
+            -f "agent_assignment[base_branch]=${{ github.event.repository.default_branch }}"
+
+  start-review:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'Copilot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reviewer beauftragen
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "@copilot Arbeite jetzt als **Reviewer**-Agent gemaess \`.github/agents/reviewer.agent.md\`. Pruefe diesen PR mit der Checkliste und antworte nur als Kommentar, ohne Code zu aendern und ohne neuen PR. Beende die Antwort mit genau einer Zeile: \`ERGEBNIS: AENDERUNGEN NOETIG\` oder \`ERGEBNIS: FREIGABE\`."
+
+  after-review:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == 'Copilot' &&
+      contains(github.event.comment.body, 'ERGEBNIS:')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Analyst korrigieren lassen oder Tester starten
+        env:
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          pr=${{ github.event.issue.number }}
+          if echo "$BODY" | grep -q 'ERGEBNIS: AENDERUNGEN NOETIG'; then
+            rounds=$(gh pr view "$pr" --json comments \
+              --jq '[.comments[] | select(.body | contains("agent-fix-round"))] | length')
+            if [ "$rounds" -ge "$MAX_FIX_ROUNDS" ]; then
+              gh pr comment "$pr" --body "Maximale Anzahl an Korrekturrunden erreicht. Bitte manuell pruefen."
+              exit 0
+            fi
+            gh pr comment "$pr" --body "@copilot Arbeite als **Analyst**-Agent gemaess \`.github/agents/analyst.agent.md\` und setze die Punkte unter \"Muss geaendert werden\" aus dem Review um. <!-- agent-fix-round -->"
+          elif echo "$BODY" | grep -q 'ERGEBNIS: FREIGABE'; then
+            gh pr comment "$pr" --body "@copilot Arbeite als **Tester**-Agent gemaess \`.github/agents/tester.agent.md\`. Ergaenze Tests fuer Fehlerfall und Normalbetrieb in diesem PR, ohne Produktivcode zu aendern. Beschreibe gefundene Fehler im PR. Beende mit der Zeile \`TESTER: FERTIG\`."
+          fi
