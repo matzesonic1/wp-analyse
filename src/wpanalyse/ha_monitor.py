@@ -9,7 +9,7 @@ import threading
 from collections.abc import Sequence
 
 from wpanalyse.adapters.novelan_ladv9 import NovelanLadv9Adapter
-from wpanalyse.log_setup import konfiguriere_logging
+from wpanalyse.logging_config import konfiguriere_logging
 from wpanalyse.monitor import Monitor
 from wpanalyse.speicher.sqlite import SQLiteSpeicher
 
@@ -45,10 +45,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--einmal", action="store_true", help="nur eine Abfrage ausführen")
     args = parser.parse_args(argv)
 
-    konfiguriere_logging()
-    log.info("Home-Assistant-Monitor gestartet")
-
     try:
+        konfiguriere_logging()
+        log.info("Home-Assistant-Monitor gestartet")
         adapter = NovelanLadv9Adapter()
         with SQLiteSpeicher(args.db) as speicher:
             monitor = Monitor(adapter, speicher, args.intervall, min_intervall_s=60.0)

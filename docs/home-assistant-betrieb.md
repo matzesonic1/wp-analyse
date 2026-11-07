@@ -46,6 +46,23 @@ Home-Assistant-App keine direkt installierbare Python-Anwendung auf dem HA-OS-Ho
 - Das Streamlit-Dashboard ist eine separate Anwendung. Derzeit ist es nicht als
   Home-Assistant-App oder über eine Home-Assistant-Seitenleiste eingebunden.
 
+## Logs und Logstufe
+
+Bei der Supervisor-App sind die Laufzeitmeldungen in der App-Ansicht unter **Einstellungen
+→ Apps → WP-Analyse → Protokoll** zu finden. Der Supervisor sammelt die Container-Ausgabe;
+die App schreibt keine separate Logdatei. Beim eigenständigen CLI-Betrieb erscheinen die
+Meldungen im Ausgabekanal des gestarteten Prozesses beziehungsweise im Log des dafür
+verwendeten Prozess-Managers.
+
+Vorgesehen ist `INFO` als Standardstufe und `WPANALYSE_LOG_LEVEL=DEBUG` für eine gezielte
+Fehlersuche. Logs dürfen keine Zugangsdaten oder unsicheren externen Fehlerdetails
+enthalten. Diese Konfiguration ist derzeit noch nicht implementiert: Die CLI-Einstiege
+verwenden fest `INFO`, und die Supervisor-App bietet noch keine Einstellung für die
+Logstufe. `WPANALYSE_LOG_LEVEL` kann daher aktuell noch nicht als wirksame Konfiguration
+genutzt werden. Die derzeitige Python-Logging-Konfiguration schreibt nach `stderr`; der
+Supervisor zeigt die Container-Ausgabe trotzdem in der App-Protokollansicht an. Die
+Zielvorgabe des Logkonzepts ist eine gemeinsame Konfiguration und Ausgabe nach `stdout`.
+
 Die Raspberry-Pi-Unterstützung ist auf 64-Bit-Home-Assistant-OS (`aarch64`)
 ausgelegt. Zusammen mit `amd64` sind dies die in der App-Metadatei und im
 Build-Workflow eingetragenen Architekturen. `armv7`/32-Bit wird ausdrücklich
@@ -105,6 +122,28 @@ Die verfügbaren Entity-Variablen stehen in `.env.example`. `--einmal` führt nu
 eine Abfrage aus. Das Pollingintervall wird zum Schutz des Reglers mindestens auf
 60 Sekunden begrenzt. Netzwerkfehler lösen begrenzte Wiederholungen mit
 exponentiellem Backoff aus; fehlgeschlagene Messungen werden nicht ergänzt.
+
+### Logs und Log-Stufe
+
+Der Prozess schreibt Logs nach `stdout`. Standardmäßig gilt `INFO`; für zusätzliche
+Diagnosen wird `WPANALYSE_LOG_LEVEL=DEBUG` in der Prozessumgebung gesetzt, zum Beispiel:
+
+```bash
+WPANALYSE_LOG_LEVEL=DEBUG python -m wpanalyse.ha_monitor --intervall 60 --db data/wp.sqlite
+```
+
+Bei einem eigenständigen Dienst muss die Variable in dessen Dienst- oder
+Container-Umgebung gesetzt werden. Im Home-Assistant-App-Betrieb sind die
+Container-Ausgaben unter **Einstellungen → Apps → WP-Analyse → Protokolle** (App-Logs)
+einsehbar. Die Supervisor-App-Konfiguration stellt derzeit noch keine Log-Stufe
+bereit und die Einstiege lesen `WPANALYSE_LOG_LEVEL` noch nicht aus; bis zur
+gemeinsamen Implementierung gilt daher die fest codierte Stufe `INFO`. Danach soll
+eine App-Option für die Log-Stufe denselben Wert an `WPANALYSE_LOG_LEVEL` übergeben.
+
+Logs enthalten keine Zugangsdaten wie `HA_TOKEN`. Fehlermeldungen aus externen
+Systemen werden auf eine sichere Zusammenfassung begrenzt; ungeprüfte Fehlertexte
+und Tracebacks werden nicht ausgegeben. Die Log-Regeln und der aktuelle
+Implementierungsstand sind in der [Architektur](architektur.md#logging) festgehalten.
 
 ### Betrieb auf demselben Raspberry Pi mit Home Assistant OS
 

@@ -17,7 +17,7 @@ from .alarm import AlarmManager
 from .alarm.melder import NtfyMelder
 from .config import Config
 from .erfassung import sammle_und_speichere
-from .log_setup import konfiguriere_logging
+from .logging_config import konfiguriere_logging
 from .monitoring import pruefe_und_melde
 from .speicher.sqlite import SQLiteSpeicher
 from .tageslauf import erzeuge_tagesbericht
@@ -157,10 +157,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Zielordner für Tagesberichte",
     )
     args = parser.parse_args(argv)
-    konfiguriere_logging()
-    log.info("Dauerbetrieb gestartet")
-
     try:
+        konfiguriere_logging()
+        log.info("Dauerbetrieb gestartet")
         adapter = NovelanLadv9Adapter()
         melder = NtfyMelder() if os.environ.get("NTFY_TOPIC") else _LogMelder()
         bericht_ordner = Path(args.bericht_ordner)

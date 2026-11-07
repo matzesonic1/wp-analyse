@@ -11,7 +11,7 @@ from collections.abc import Callable
 
 from wpanalyse.adapters.base import DatenAdapter
 from wpanalyse.config import LuxtronikConfig
-from wpanalyse.log_setup import konfiguriere_logging
+from wpanalyse.logging_config import konfiguriere_logging
 from wpanalyse.speicher.sqlite import SQLiteSpeicher
 
 log = logging.getLogger("wpanalyse.monitor")
@@ -40,8 +40,11 @@ class Monitor:
                 log.warning("Keine Messwerte empfangen, nächster Versuch im Intervall")
                 return False
             self._speicher.speichern(df)
-        except Exception:  # noqa: BLE001 - Abfrage- und Speicherfehler müssen den Poller nicht beenden.
-            log.error("Abfrage fehlgeschlagen, nächster Versuch im Intervall")
+        except Exception as exc:  # noqa: BLE001 - Adapter und Speicher können unterschiedliche Fehler werfen.
+            log.error(
+                "Abfrage fehlgeschlagen, nächster Versuch im Intervall (%s)",
+                type(exc).__name__,
+            )
             return False
         log.info("Messung gespeichert: %s", df.index[0].isoformat())
         return True
@@ -70,19 +73,27 @@ def main() -> None:
     parser.add_argument("--einmal", action="store_true", help="nur eine Abfrage")
     args = parser.parse_args()
 
-    konfiguriere_logging()
-    log.info("Monitoring gestartet")
-    config = LuxtronikConfig.aus_umgebung()
-    with SQLiteSpeicher(args.db) as speicher:
-        monitor = Monitor(LuxtronikAdapter(config), speicher, args.intervall, config.min_intervall_s)
-        if args.einmal:
-            monitor.einmal()
-            log.info("Monitoring beendet")
-            return
-        try:
+    try:
+        konfiguriere_logging()
+        log.info("Monitoring gestartet")
+        config = LuxtronikConfig.aus_umgebung()
+        with SQLiteSpeicher(args.db) as speicher:
+            monitor = Monitor(
+                LuxtronikAdapter(config),
+                speicher,
+                args.intervall,
+                config.min_intervall_s,
+            )
+            if args.einmal:
+                monitor.einmal()
+                log.info("Monitoring beendet")
+                return
             monitor.laufen()
-        except KeyboardInterrupt:
-            log.info("Monitoring beendet")
+    except KeyboardInterrupt:
+        log.info("Monitoring beendet")
+    except Exception as exc:  # noqa: BLE001 - Startfehler werden ohne Details protokolliert.
+        log.error("Monitoring fehlgeschlagen (%s)", type(exc).__name__)
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":
