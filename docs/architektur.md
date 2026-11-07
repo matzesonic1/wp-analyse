@@ -77,6 +77,27 @@ Statuscheck des Jobs in den Branch-Protection- beziehungsweise Ruleset-Einstellu
 `main` als erforderlich aktivieren. Ein erfolgreicher Image-Build allein weist nicht nach,
 dass Ruff und pytest erfolgreich waren.
 
+## Protokollierung
+
+Für alle Anwendungseinstiege gilt als Ziel ein einheitliches Logging mit `INFO` als
+Standardstufe. `WPANALYSE_LOG_LEVEL` überschreibt die Stufe; `DEBUG` dient der gezielten
+Fehlersuche. Die Ausgabe erfolgt nach `stdout`, damit sie in Terminals und von
+Prozess-/Container-Managern gesammelt werden kann. Die Einstiege sollen dafür eine gemeinsame
+Funktion `konfiguriere_logging(stufe: str | None = None) -> None` verwenden.
+
+Logs enthalten weder Zugangsdaten (insbesondere `HA_TOKEN`) noch vollständige
+Konfigurationswerte, Rohantworten oder unsichere Fehlerdetails und Tracebacks aus externen
+Bibliotheken. Fehler werden mit einer sicheren Zusammenfassung protokolliert; Zugangsdaten
+aus Logs herauszufiltern ersetzt nicht, sie gar nicht erst zu protokollieren.
+
+Dieses Konzept gilt für `python -m wpanalyse.monitor`, `python -m wpanalyse.ha_monitor`,
+`python -m wpanalyse.run` und den Supervisor-Einstieg `wp-analyse/run.py`. Der aktuelle
+Code setzt die Stufe in den CLI-Einstiegen jeweils fest auf `INFO`; `WPANALYSE_LOG_LEVEL`
+und die gemeinsame Funktion sind noch nicht umgesetzt. `logging.basicConfig` schreibt
+derzeit standardmäßig nach `stderr`. Auch die einheitliche Durchsetzung der Regeln für
+sensible Fehlerdetails steht damit noch aus; insbesondere protokolliert `monitor.py`
+Abfragefehler aktuell mit Traceback. Die Umsetzung muss dem dokumentierten Konzept folgen.
+
 ## Live-Datenfluss
 ```
  Luxtronik-Regler ──(TCP 8889, lesend)──► LuxtronikAdapter.aktuell()
