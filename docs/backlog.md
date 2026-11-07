@@ -19,6 +19,10 @@ Jedes Issue ist so geschnitten, dass ein Agent es in einem PR erledigen kann.
 | 9c | Tagesbericht aus dem Speicher erzeugen | analyst | D | 7, 8 |
 | 9d | CLI und Scheduler integrieren | architekt | – | 9a, 9b, 9c |
 | 10 | Dashboard (Streamlit) | analyst | – | 7 |
+| 11 | Luxtronik-CSV: Feldinventur und fokussierter Import | datensammler | – | – |
+| 12 | SQLite-Kernschema für Anlagen und Messwerte | datensammler | – | bestehender SQLite-Speicher |
+| 13 | Raumtemperaturen relational speichern | datensammler | – | 12 |
+| 14 | Störungs- und Wartungsereignisse speichern | datensammler | – | 13 |
 
 ---
 
@@ -123,3 +127,43 @@ Jedes Issue ist so geschnitten, dass ein Agent es in einem PR erledigen kann.
 **Testidee:** Synthetische CSV mit leerer Zeitspaltenüberschrift, zwei UTC-Zeitpunkten, bekannten Basisfeldern sowie unbekannten/ungeklärten Spalten einlesen; Zeitindex, Mapping, Ausschluss unbestätigter Kennzahlen und fehlende Werte prüfen.
 
 **Nicht Teil dieses Issues:** Effizienzbewertung, Reparaturempfehlungen und Defektvorhersage aus dem kurzen Ausschnitt ableiten. Die Effizienzanalyse benötigt bestätigte Wärme- und Stromenergie; Verbesserungs- und Reparaturhinweise benötigen längere Verläufe und geklärte Feldsemantik; Defektvorhersage zusätzlich historische, bestätigte Ausfall- oder Reparaturereignisse.
+
+### Issue 12 – SQLite-Kernschema für Anlagen und Messwerte
+**Ziel:** Das bisherige JSON-Zeilenformat des SQLite-Speichers auf das Zielschema `anlage` und `messwert` aus `docs/architektur.md` umstellen, ohne bestehende Messdaten oder die DataFrame-Schnittstelle zu verlieren.
+**Agent:** datensammler
+**Betroffene Dateien:** `src/wpanalyse/speicher/sqlite.py`, `tests/test_sqlite_speicher.py`.
+**Schnittstelle:** `SQLiteSpeicher(pfad: str | Path, anlage_id: str = "standard")`; `speichern(df: pd.DataFrame) -> None`; `lese(von: datetime, bis: datetime) -> pd.DataFrame`.
+**Akzeptanzkriterien:**
+- Legt die Anlagen- und Messwerttabellen nach dem Feld- und Typvertrag in `docs/architektur.md` an; pro Anlage und UTC-Zeitpunkt gibt es höchstens einen Messwert.
+- Alle Messwertspalten außer Anlagen-ID und Zeitstempel sind nullable; Boolesche Werte werden konsistent als `0`/`1` gespeichert und gelesen.
+- `strom_kwh` und `waerme_kwh` sind Intervallenergien; bestätigte kumulative Energiezähler und Verdichterlaufzeiten werden nur in den dafür vorgesehenen getrennten Zähler-/Intervallfeldern gespeichert. Nicht zugeordnete Eingabespalten bleiben in `rohfelder_json` erhalten und werden nicht als Analysefelder ausgegeben.
+- Migration des bisherigen `messwerte(zeit_ns, daten)`-Formats bewahrt alle Zeilen: bekannte Felder werden typisiert, andere Felder bleiben in den Rohfeldern; sie werden der Anlagen-ID `standard` zugewiesen.
+- UTC-Normalisierung, halboffene Zeitraumabfrage, leere DataFrames mit Spaltennamen und Aktualisierung doppelter Zeitstempel bleiben unterstützt.
+- Schreib-/Lesevorgänge für zwei unterschiedliche Anlagen mit demselben Zeitpunkt bleiben voneinander getrennt.
+**Testidee:** Bestehende Persistenztests erweitern um Migration eines alten JSON-Datensatzes, nullable Werte, Rohfeld-Rundlauf, Intervallenergien, zwei Anlagen am selben Zeitpunkt und bestehende UTC-/Zeitraumsemantik.
+
+### Issue 13 – Raumtemperaturen relational speichern
+**Ziel:** Raumwerte aus `raum_<name>_c`-Eingabespalten in die Tabelle `raum_messwert` aus `docs/architektur.md` normalisieren.
+**Agent:** datensammler
+**Betroffene Dateien:** `src/wpanalyse/speicher/sqlite.py`, `tests/test_sqlite_speicher.py`.
+**Schnittstelle:** `SQLiteSpeicher.speichere_raeume(df: pd.DataFrame, sollwerte_c: Mapping[str, float] | None = None) -> None`; `SQLiteSpeicher.lese_raeume(von: datetime, bis: datetime) -> pd.DataFrame`.
+**Abhängigkeit:** Issue 12.
+**Akzeptanzkriterien:**
+- Speichert je Anlage, Zeitpunkt und Raum eine Zeile mit Isttemperatur und optionalem zu diesem Zeitpunkt gültigem Sollwert.
+- Unterstützt beliebig viele Räume ohne dynamische SQL-Spalten; fehlende Ist- oder Sollwerte werden nicht erfunden.
+- UTC-Zeitstempel sowie Schlüssel und Nullable-Regeln entsprechen `docs/architektur.md`.
+- Bestehende Messwertspalten und Speicherabfragen bleiben unverändert.
+**Testidee:** Synthetische Zeitreihe mit zwei Räumen und wechselnden Sollwerten speichern und zeilenweise einschließlich fehlender Werte und UTC-Zeitstempeln wieder auslesen.
+
+### Issue 14 – Störungs- und Wartungsereignisse speichern
+**Ziel:** Roh gemeldete Störungen sowie dokumentierte Wartungs-/Reparaturfälle getrennt in den Tabellen `stoerung` und `wartung_reparatur` persistieren.
+**Agent:** datensammler
+**Betroffene Dateien:** `src/wpanalyse/speicher/sqlite.py`, `tests/test_sqlite_speicher.py`.
+**Schnittstelle:** `speichere_stoerung(ereignis: Stoerung) -> None`; `speichere_wartung(ereignis: WartungReparatur) -> None`; Zeitraum-Leseoperationen für beide Ereignistypen.
+**Abhängigkeit:** Issue 13.
+**Akzeptanzkriterien:**
+- Feldnamen, Zeitspalten und Nullbarkeit entsprechen `docs/architektur.md`; Ereignisse sind einer bestehenden Anlage zugeordnet.
+- Fehlercodes und Rohbeschreibungen bleiben unverändert erhalten; unbekannte Codes werden nicht automatisch diagnostiziert.
+- Wartungsfälle enthalten dokumentierte Maßnahme und optional einen bestätigten Fehler getrennt von einer bloßen Störung.
+- Ereignisse sind über stabile IDs idempotent speicherbar und anhand Anlage/Zeitbereich abfragbar.
+**Testidee:** Je ein Störungs- und Wartungsereignis mit fehlenden optionalen Feldern speichern, erneut laden und unveränderte Codes, Texte, Zeitstempel und Anlagenzuordnung prüfen.
