@@ -1,5 +1,6 @@
 import pandas as pd
 
+from wpanalyse import dashboard
 from wpanalyse.dashboard import (
     berechne_az_nach_aussentemperatur,
     berechne_starts_pro_tag,
@@ -7,6 +8,31 @@ from wpanalyse.dashboard import (
     numerische_spalten,
 )
 from wpanalyse.simulation import simuliere
+
+
+def test_reglerabfrage_uebergibt_host_und_port_an_adapter(monkeypatch):
+    erfasste_konfigurationen = []
+
+    class AdapterFake:
+        def __init__(self, config):
+            erfasste_konfigurationen.append(config)
+
+    class MonitorFake:
+        def __init__(self, adapter, speicher, intervall_s):
+            pass
+
+        def einmal(self):
+            return True
+
+    monkeypatch.setattr(dashboard, "lade_live_daten", lambda speicher, stunden: pd.DataFrame())
+    monkeypatch.setattr("wpanalyse.adapters.luxtronik.LuxtronikAdapter", AdapterFake)
+    monkeypatch.setattr("wpanalyse.monitor.Monitor", MonitorFake)
+
+    status = dashboard.frage_regler_ab(object(), "regler.example", 12345, 60)
+
+    assert status == "Abfrage erfolgreich"
+    assert erfasste_konfigurationen[0].host == "regler.example"
+    assert erfasste_konfigurationen[0].port == 12345
 
 
 def test_freie_auswahl_erkennt_zahlen_und_bool():

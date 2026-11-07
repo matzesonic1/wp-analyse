@@ -8,7 +8,8 @@ nicht vorgesehen.
 ## Voraussetzungen
 - Der Regler hängt per LAN im Netz und ist erreichbar (Prüfung:
   `Test-NetConnection <ip> -Port 8889`).
-- Die Adresse steht in der Umgebungsvariable `LUXTRONIK_HOST`, nicht im Code.
+- Host und Port können über die Umgebungsvariablen `LUXTRONIK_HOST` und
+  `LUXTRONIK_PORT` vorgegeben werden (Standardport: `8889`).
 - Installation: `pip install -e ".[luxtronik,dashboard]"`
 
 ## Starten
@@ -56,6 +57,8 @@ ist ein separater Stromzähler nötig (noch nicht angebunden).
 - Das Intervall liegt bei mindestens 60 s, auch wenn weniger angegeben wird.
 - Das Dashboard fragt nur ab, wenn die letzte Messung älter als das Intervall ist; mehrere
   offene Tabs und ein parallel laufender Monitor erzeugen keine doppelten Abfragen.
+- Host- und Port-Auswahl im Dashboard gelten nur für die aktuelle Streamlit-Sitzung und werden
+  nicht dauerhaft gespeichert.
 - Der Regler hält keine Historie vor. Daten entstehen nur, solange der Monitor oder das
   Dashboard läuft.
 
