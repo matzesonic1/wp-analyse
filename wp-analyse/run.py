@@ -39,6 +39,7 @@ def main_app() -> int:
     optionen = _optionen_laden()
     os.environ["HA_URL"] = str(optionen.get("ha_url", ""))
     os.environ["HA_TOKEN"] = str(optionen.get("ha_token", ""))
+    os.environ["WPANALYSE_LOG_LEVEL"] = str(optionen.get("log_level", "INFO"))
     for option, variable in _ENTITY_UMGEBUNGSMAPPING.items():
         wert = str(optionen.get(option, "") or "")
         if wert:

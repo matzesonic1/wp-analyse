@@ -91,12 +91,9 @@ Bibliotheken. Fehler werden mit einer sicheren Zusammenfassung protokolliert; Zu
 aus Logs herauszufiltern ersetzt nicht, sie gar nicht erst zu protokollieren.
 
 Dieses Konzept gilt für `python -m wpanalyse.monitor`, `python -m wpanalyse.ha_monitor`,
-`python -m wpanalyse.run` und den Supervisor-Einstieg `wp-analyse/run.py`. Der aktuelle
-Code setzt die Stufe in den CLI-Einstiegen jeweils fest auf `INFO`; `WPANALYSE_LOG_LEVEL`
-und die gemeinsame Funktion sind noch nicht umgesetzt. `logging.basicConfig` schreibt
-derzeit standardmäßig nach `stderr`. Auch die einheitliche Durchsetzung der Regeln für
-sensible Fehlerdetails steht damit noch aus; insbesondere protokolliert `monitor.py`
-Abfragefehler aktuell mit Traceback. Die Umsetzung muss dem dokumentierten Konzept folgen.
+`python -m wpanalyse.run` und den Supervisor-Einstieg `wp-analyse/run.py`. Alle nutzen
+`wpanalyse.logging_config.konfiguriere_logging`; die Supervisor-App übergibt ihre
+konfigurierbare Logstufe über `WPANALYSE_LOG_LEVEL`.
 
 ## Live-Datenfluss
 ```
@@ -152,12 +149,10 @@ Alle Prozess-Einstiege (`python -m wpanalyse.run`, `python -m wpanalyse.ha_monit
   protokolliert, insbesondere ohne ungeprüften Fehlertext oder Traceback, der
   Zugangsdaten enthalten könnte.
 
-Die aktuelle Codebasis setzt an den Einstiegen `INFO` über `logging.basicConfig`;
-`WPANALYSE_LOG_LEVEL` und eine einheitliche Konfigurationsfunktion sind noch nicht
-verdrahtet. Die Log-Ausgabe in `wpanalyse.monitor` protokolliert derzeit außerdem
-Ausnahme-Tracebacks und entspricht damit noch nicht vollständig der obigen Regel.
-Die spätere gemeinsame Konfiguration hat die Schnittstelle
-`konfiguriere_logging(stufe: str | None = None) -> None`.
+Die gemeinsame Implementierung liegt in `wpanalyse.logging_config` und stellt die
+Schnittstelle `konfiguriere_logging(stufe: str | None = None) -> None` bereit.
+Sensible Umgebungsvariablen werden vor der Ausgabe redigiert; Exception- und Stack-
+Tracebacks werden durch eine sichere Fehlerzusammenfassung ersetzt.
 
 ## Home-Assistant-App
 

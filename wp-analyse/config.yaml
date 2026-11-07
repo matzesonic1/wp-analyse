@@ -26,6 +26,7 @@ options:
   entity_warmwasser_c: ""
   entity_stoerung: ""
   intervall_s: 60
+  log_level: INFO
 schema:
   ha_url: str
   ha_token: password
@@ -42,4 +43,5 @@ schema:
   entity_warmwasser_c: str?
   entity_stoerung: str?
   intervall_s: int(60,86400)
+  log_level: list(INFO|DEBUG|WARNING|ERROR)
 image: ghcr.io/matzesonic1/wp-analyse

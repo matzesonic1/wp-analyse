@@ -54,14 +54,10 @@ die App schreibt keine separate Logdatei. Beim eigenständigen CLI-Betrieb ersch
 Meldungen im Ausgabekanal des gestarteten Prozesses beziehungsweise im Log des dafür
 verwendeten Prozess-Managers.
 
-Vorgesehen ist `INFO` als Standardstufe und `WPANALYSE_LOG_LEVEL=DEBUG` für eine gezielte
-Fehlersuche. Logs dürfen keine Zugangsdaten oder unsicheren externen Fehlerdetails
-enthalten. Diese Konfiguration ist derzeit noch nicht implementiert: Die CLI-Einstiege
-verwenden fest `INFO`, und die Supervisor-App bietet noch keine Einstellung für die
-Logstufe. `WPANALYSE_LOG_LEVEL` kann daher aktuell noch nicht als wirksame Konfiguration
-genutzt werden. Die derzeitige Python-Logging-Konfiguration schreibt nach `stderr`; der
-Supervisor zeigt die Container-Ausgabe trotzdem in der App-Protokollansicht an. Die
-Zielvorgabe des Logkonzepts ist eine gemeinsame Konfiguration und Ausgabe nach `stdout`.
+`INFO` ist die Standardstufe; für gezielte Fehlersuche kann `DEBUG` gewählt werden.
+Die gemeinsame Konfiguration schreibt nach `stdout` und unterdrückt Zugangsdaten sowie
+unsichere Fehlerdetails und Tracebacks. Beim eigenständigen Betrieb wird die Stufe über
+`WPANALYSE_LOG_LEVEL` gesetzt, in der Supervisor-App über die Option **Log-Stufe**.
 
 Die Raspberry-Pi-Unterstützung ist auf 64-Bit-Home-Assistant-OS (`aarch64`)
 ausgelegt. Zusammen mit `amd64` sind dies die in der App-Metadatei und im
@@ -135,10 +131,8 @@ WPANALYSE_LOG_LEVEL=DEBUG python -m wpanalyse.ha_monitor --intervall 60 --db dat
 Bei einem eigenständigen Dienst muss die Variable in dessen Dienst- oder
 Container-Umgebung gesetzt werden. Im Home-Assistant-App-Betrieb sind die
 Container-Ausgaben unter **Einstellungen → Apps → WP-Analyse → Protokolle** (App-Logs)
-einsehbar. Die Supervisor-App-Konfiguration stellt derzeit noch keine Log-Stufe
-bereit und die Einstiege lesen `WPANALYSE_LOG_LEVEL` noch nicht aus; bis zur
-gemeinsamen Implementierung gilt daher die fest codierte Stufe `INFO`. Danach soll
-eine App-Option für die Log-Stufe denselben Wert an `WPANALYSE_LOG_LEVEL` übergeben.
+einsehbar. Die Auswahl der Log-Stufe in der Supervisor-App wird vom App-Einstieg an
+`WPANALYSE_LOG_LEVEL` weitergegeben.
 
 Logs enthalten keine Zugangsdaten wie `HA_TOKEN`. Fehlermeldungen aus externen
 Systemen werden auf eine sichere Zusammenfassung begrenzt; ungeprüfte Fehlertexte
