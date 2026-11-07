@@ -22,7 +22,7 @@ from .tageslauf import erzeuge_tagesbericht
 
 log = logging.getLogger("wpanalyse.run")
 _REGELINTERVALL_S = 15 * 60
-_PRUEFZEITRAUM = timedelta(days=30)
+_PRUEFZEITRAUM = timedelta(days=31)
 
 
 def _intervall(wert: str) -> float:
@@ -93,6 +93,8 @@ class Scheduler:
                 letzte_sammlung = jetzt
                 naechste_sammlung = jetzt + timedelta(seconds=self.intervall_s)
                 log.info("Messwerte gesammelt")
+                if stop():
+                    break
 
             if jetzt >= naechste_pruefung:
                 self.pruefen(
@@ -104,6 +106,8 @@ class Scheduler:
                 )
                 naechste_pruefung = jetzt + timedelta(seconds=_REGELINTERVALL_S)
                 log.info("Regelprüfung abgeschlossen")
+                if stop():
+                    break
 
             while naechster_bericht <= jetzt:
                 tag = naechster_bericht.date() - timedelta(days=1)
@@ -115,7 +119,11 @@ class Scheduler:
                 )
                 log.info("Tagesbericht für %s erzeugt", tag.isoformat())
                 naechster_bericht += timedelta(days=1)
+                if stop():
+                    break
 
+            if stop():
+                break
             naechster_termin = min(naechste_sammlung, naechste_pruefung, naechster_bericht)
             self.warten(max(0.0, (naechster_termin - self._jetzt()).total_seconds()))
 

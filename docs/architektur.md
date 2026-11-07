@@ -25,6 +25,7 @@
 | `adapters/novelan_ladv9.py` | datensammler | vorhanden (Home-Assistant-REST-API) |
 | `monitor.py` | datensammler | vorhanden (60-s-Abfrage nach SQLite) |
 | `ha_monitor.py` | datensammler | vorhanden (Home-Assistant-Adapter und SQLite) |
+| `run.py` | architekt | vorhanden (Sammeln, Regelprüfung und Tagesbericht im Scheduler) |
 | `testseite.py` | datensammler | vorhanden (manuelle Testabfrage) |
 | `wp-analyse/` | datensammler | Supervisor-App-Konfiguration und Dockerfile vorhanden; Installation, Image-Build und Laufzeit nicht verifiziert |
 | `analyse/taktung.py` | analyst | Beispiel vorhanden |
@@ -85,6 +86,24 @@ dass Ruff und pytest erfolgreich waren.
 Der Regler hat keine Historie; Daten entstehen nur, solange Monitor oder Dashboard laufen.
 Das Dashboard fragt nur ab, wenn die letzte Messung älter als das Intervall ist.
 Siehe [`luxtronik-anbindung.md`](luxtronik-anbindung.md).
+
+## Integrierter Dauerbetrieb
+
+`python -m wpanalyse.run` verbindet `sammle_und_speichere`, `pruefe_und_melde` und
+`erzeuge_tagesbericht`. Der Lauf nutzt den `NovelanLadv9Adapter` und benötigt daher
+`HA_URL`, `HA_TOKEN` und mindestens eine konfigurierte `NOVELAN_ENTITY_*`-Variable.
+Das Sammelintervall wird in Sekunden über `--intervall` oder `WPANALYSE_INTERVAL`
+gesetzt (Standard: 60); Datenbank und Berichtsziel sind über `--db` /
+`WPANALYSE_DB` und `--bericht-ordner` / `WPANALYSE_REPORT_DIR` konfigurierbar.
+Die Regeln werden beim Start und anschließend alle 15 Minuten über die letzten
+31 Tage geprüft. An jedem UTC-Tageswechsel wird der Bericht des abgeschlossenen
+Vortags unter `<Berichtsziel>/JJJJ-MM-TT.md` gespeichert.
+
+Mit `NTFY_TOPIC` werden Alarme über ntfy versendet; ohne ntfy-Konfiguration werden
+Befunde protokolliert. Sammel-, Prüf- oder Berichtsfehler beenden den Prozess mit
+Fehlerstatus, statt den fehlgeschlagenen Lauf als erfolgreich zu behandeln. Strg+C
+und SIGTERM beenden den Scheduler geordnet. Die Regelprüfung und Berichtserzeugung
+arbeiten mit den gespeicherten Werten; die Tagesberichte verwenden UTC.
 
 Die am 07.11.2026 geprüfte `data/wp.sqlite` enthielt 58 Messungen, bestand die
 SQLite-Integritätsprüfung und wies 5 Abstände von mehr als 90 Sekunden auf. Sie enthält

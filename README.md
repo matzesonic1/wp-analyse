@@ -27,6 +27,10 @@ Das Konzept für den Betrieb auf Home Assistant OS steht in
 [`docs/home-assistant-betrieb.md`](docs/home-assistant-betrieb.md).
 Für den Dauerbetrieb mit Home Assistant:
 `python -m wpanalyse.ha_monitor --intervall 60 --db data/wp.sqlite`.
+Für den integrierten Ablauf aus Sammeln, Regelprüfung und täglichem UTC-Bericht:
+`python -m wpanalyse.run --intervall 60 --db data/wp.sqlite --bericht-ordner reports`.
+Konfiguration und ntfy-Alarmierung stehen in
+[`docs/architektur.md`](docs/architektur.md#integrierter-dauerbetrieb).
 Die Supervisor-App und der Multi-Architektur-Image-Build liegen unter
 [`wp-analyse/`](wp-analyse/).
 Modbus und eine Stromzähler-Quelle (für die Arbeitszahl) sind noch nicht implementiert.
