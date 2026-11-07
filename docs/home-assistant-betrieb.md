@@ -125,11 +125,36 @@ eine Installation mit veröffentlichtem Container-Image:
    Die SQLite-Datei liegt im persistenten App-Verzeichnis `/data/wp.sqlite`.
 5. Nach Neustart und Update prüfen, dass die SQLite-Historie erhalten bleibt.
 
-Der Build-Workflow publiziert bei einem Push nach `main` die Version aus
-`wp-analyse/config.yaml` sowie `latest`. Vor einer neuen Veröffentlichung muss
-diese Versionsnummer erhöht werden; ein bereits vorhandener Versions-Tag wird
-nicht überschrieben. Nach dem ersten Paket-Push ist gegebenenfalls die GHCR-
-Paket-Sichtbarkeit auf **public** zu setzen. Es gibt keine eingehenden Ports.
+### Versionierung der App-Images
+
+Die `version` in `wp-analyse/config.yaml` ist die maßgebliche Version der
+Home-Assistant-App und des zugehörigen versionierten OCI-Images. Sie folgt
+`MAJOR.MINOR.PATCH`: Erhöhe MAJOR bei inkompatiblen Änderungen, MINOR bei
+rückwärtskompatiblen Funktionen und PATCH bei rückwärtskompatiblen Fehlerkorrekturen.
+Jede veröffentlichte Version ist eindeutig und wird nicht wiederverwendet.
+
+Der Build-Workflow liest diese Versionsnummer und veröffentlicht bei passenden
+Pushes nach `main` sowohl das versionierte Image als auch `latest`. Vor jedem
+Push, der ein neues App-Image veröffentlichen soll, muss die App-Version erhöht
+werden. Der Pflichtcheck bricht ab, wenn der Versions-Tag bereits existiert.
+`latest` ist ein veränderlicher Verweis und kein Ersatz für eine neue
+App-Version. Ein Release-Commit sollte zusätzlich mit dem dazu passenden
+Git-Tag `vMAJOR.MINOR.PATCH` markiert werden; der Workflow wird durch den Push
+nach `main`, nicht durch den Tag ausgelöst.
+
+Der Workflow prüft die Version vor dem Build gegen vorhandene GHCR-Versionstags
+und bricht ab, wenn der Tag schon existiert oder die Registry-Abfrage fehlschlägt.
+Bei Pull Requests mit Änderungen an App oder Anwendungscode muss die Version
+außerdem höher als die Version auf `main` sein. Damit schlägt ein fehlender
+Versionsschritt bereits im Pflichtcheck fehl; `latest` wird nicht als Nachweis
+verwendet.
+
+Die Version in `pyproject.toml` bezeichnet die Python-Distribution und wird vom
+App-Image-Workflow nicht als Quelle verwendet. Sie wird unabhängig gepflegt,
+solange keine Python-Paketveröffentlichung mit eigener Versionsfreigabe erfolgt.
+
+Nach dem ersten Paket-Push ist gegebenenfalls die GHCR-Paket-Sichtbarkeit auf
+**public** zu setzen. Es gibt keine eingehenden Ports.
 
 Zielhardware-Validierung bleibt offen: Installation über den Supervisor,
 Raspberry-Pi-Modell/HA-OS-Version, aarch64-Image, Container-Start, Neustart,

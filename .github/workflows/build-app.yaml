@@ -31,6 +31,7 @@ jobs:
       build_matrix: ${{ steps.matrix.outputs.matrix }}
       image_name: ${{ steps.normalize.outputs.image_name }}
       registry_prefix: ${{ steps.normalize.outputs.registry_prefix }}
+      image: ${{ steps.normalize.outputs.image }}
       version: ${{ steps.normalize.outputs.version }}
       app_name: ${{ steps.normalize.outputs.app_name }}
       app_description: ${{ steps.normalize.outputs.app_description }}
@@ -66,6 +67,7 @@ jobs:
           image="$(jq -r . <<< "${IMAGE}")"
           echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
           echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
           echo "version=$(jq -r . <<< "${VERSION}")" >> "$GITHUB_OUTPUT"
           echo "app_name=$(jq -r . <<< "${APP_NAME}")" >> "$GITHUB_OUTPUT"
           echo "app_description=$(jq -r . <<< "${APP_DESCRIPTION}")" >> "$GITHUB_OUTPUT"
@@ -79,9 +81,125 @@ jobs:
           image-name: ${{ steps.normalize.outputs.image_name }}
           registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
 
+  validate-version:
+    name: Validate app version
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check version format
+        env:
+          APP_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+          version_pattern+='\.(0|[1-9][0-9]*)$'
+          if [[ ! "${APP_VERSION}" =~ ${version_pattern} ]]; then
+            echo "::error::App version must use MAJOR.MINOR.PATCH: ${APP_VERSION}"
+            exit 1
+          fi
+
+      - name: Require version increase over main
+        if: github.event_name == 'pull_request'
+        env:
+          APP_VERSION: ${{ needs.prepare.outputs.version }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed_files="$(git diff --name-only "${BASE_SHA}" "${GITHUB_SHA}")"
+          if ! grep -Eq \
+            '^(wp-analyse/|src/wpanalyse/|pyproject\.toml$|README\.md$)' \
+            <<< "${changed_files}"; then
+            echo "No app files changed; version increase is not required."
+            exit 0
+          fi
+
+          git fetch origin main:refs/remotes/origin/main
+          main_version="$(
+            git show origin/main:wp-analyse/config.yaml |
+              awk '$1 == "version:" {gsub(/"/, "", $2); print $2; exit}'
+          )"
+          version_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+          version_pattern+='\.(0|[1-9][0-9]*)$'
+          if [[ ! "${main_version}" =~ ${version_pattern} ]]; then
+            echo "::error::The version on main must use MAJOR.MINOR.PATCH."
+            exit 1
+          fi
+
+          python3 - "${main_version}" "${APP_VERSION}" <<'PY'
+          import sys
+
+          main_version = tuple(map(int, sys.argv[1].split(".")))
+          app_version = tuple(map(int, sys.argv[2].split(".")))
+          if app_version <= main_version:
+              print(
+                  f"::error::App version {sys.argv[2]} must be greater than "
+                  f"main version {sys.argv[1]} when app or source files change."
+              )
+              sys.exit(1)
+          PY
+
+      - name: Check that the GHCR version tag is unused
+        env:
+          APP_VERSION: ${{ needs.prepare.outputs.version }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_USER: ${{ github.actor }}
+          IMAGE: ${{ needs.prepare.outputs.image }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            changed_files="$(git diff --name-only "${BASE_SHA}" "${GITHUB_SHA}")"
+            if ! grep -Eq \
+              '^(wp-analyse/|src/wpanalyse/|pyproject\.toml$|README\.md$)' \
+              <<< "${changed_files}"; then
+              echo "No app files changed; GHCR tag check is not required."
+              exit 0
+            fi
+          fi
+
+          registry_path="${IMAGE#ghcr.io/}"
+          token_response="$(curl --fail --silent --show-error \
+            --user "${GH_USER}:${GH_TOKEN}" \
+            "https://ghcr.io/token?scope=repository:${registry_path}:pull")"
+          registry_token="$(
+            jq -er '.token // .access_token' <<< "${token_response}"
+          )"
+          accept="application/vnd.oci.image.index.v1+json"
+          accept+=", application/vnd.docker.distribution.manifest.list.v2+json"
+          accept+=", application/vnd.oci.image.manifest.v1+json"
+          accept+=", application/vnd.docker.distribution.manifest.v2+json"
+          manifest_url="https://ghcr.io/v2/${registry_path}/manifests/${APP_VERSION}"
+          status="$(
+            curl --silent --show-error --output /dev/null \
+              --write-out '%{http_code}' \
+              --oauth2-bearer "${registry_token}" \
+              --header "Accept: ${accept}" \
+              "${manifest_url}"
+          )" || {
+              echo "::error::Could not check the GHCR version tag."
+              exit 1
+            }
+
+          if [[ "${status}" == "200" ]]; then
+            echo "::error::GHCR tag '${IMAGE}:${APP_VERSION}' already exists."
+            echo "::error::Increase the version in wp-analyse/config.yaml."
+            exit 1
+          elif [[ "${status}" != "404" ]]; then
+            echo "::error::GHCR returned HTTP ${status}."
+            echo "::error::Could not confirm that the version tag is unused."
+            exit 1
+          fi
+
   build:
     name: Build ${{ matrix.arch }} image
-    needs: prepare
+    needs:
+      - prepare
+      - validate-version
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -112,7 +230,6 @@ jobs:
             io.hass.name=${{ needs.prepare.outputs.app_name }}
             io.hass.description=${{ needs.prepare.outputs.app_description }}
           push: ${{ github.event_name != 'pull_request' }}
-          skip-existing: ${{ needs.prepare.outputs.version }}
           version: ${{ needs.prepare.outputs.version }}
 
   manifest:
