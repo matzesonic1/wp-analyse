@@ -5,7 +5,6 @@ import sys
 
 import pytest
 
-from wpanalyse import logging_config
 from wpanalyse.logging_config import konfiguriere_logging
 
 
