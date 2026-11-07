@@ -1,0 +1,64 @@
+name: agent-handoff
+
+# Kette: Copilot baut -> Reviewer prueft -> Copilot korrigiert -> Merge -> naechstes Issue.
+# Benoetigt das Secret AGENT_PAT (PAT des Repo-Besitzers mit Issues/Pull requests: write).
+
+on:
+  pull_request:
+    types: [ready_for_review]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+env:
+  GH_TOKEN: ${{ secrets.AGENT_PAT }}
+  GH_REPO: ${{ github.repository }}
+  MAX_FIX_ROUNDS: 2
+
+jobs:
+  review:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login == 'Copilot'
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr edit ${{ github.event.pull_request.number }} --add-reviewer copilot-pull-request-reviewer
+
+  fix:
+    if: >-
+      github.event_name == 'pull_request_review' &&
+      github.event.pull_request.user.login == 'Copilot' &&
+      github.event.review.user.login == 'copilot-pull-request-reviewer[bot]' &&
+      github.event.review.state == 'commented'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Korrektur beauftragen (maximal MAX_FIX_ROUNDS Runden)
+        run: |
+          pr=${{ github.event.pull_request.number }}
+          rounds=$(gh pr view "$pr" --json comments \
+            --jq '[.comments[] | select(.body | contains("<!-- agent-fix-round -->"))] | length')
+          if [ "$rounds" -ge "$MAX_FIX_ROUNDS" ]; then
+            gh pr comment "$pr" --body "Maximale Anzahl an Korrekturrunden erreicht. Bitte manuell pruefen."
+            exit 0
+          fi
+          gh pr comment "$pr" --body "@copilot Bitte setze die Review-Kommentare um. <!-- agent-fix-round -->"
+
+  next-issue:
+    if: >-
+      github.event_name == 'issues' &&
+      contains(github.event.issue.labels.*.name, 'agent-queue')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Naechstes Issue der Queue an Copilot zuweisen
+        run: |
+          next=$(gh issue list --label agent-queue --state open \
+            --json number --jq 'sort_by(.number) | .[0].number // empty')
+          if [ -n "$next" ]; then
+            gh issue edit "$next" --add-assignee "@copilot"
+          fi
