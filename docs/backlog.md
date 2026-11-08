@@ -8,6 +8,21 @@ nicht Installation, Verfügbarkeit oder Betriebsreife eines Live-Systems. „Fer
 hier: der beschriebene Codepfad ist vorhanden und durch Tests abgedeckt; reale
 Regler-/Home-Assistant-Zugriffe und App-Deployment sind damit nicht nachgewiesen.
 
+**Stand: Review und lesende Inventur vom 08.11.2026.** Zielhardware ist ein
+Raspberry Pi 5 mit Home Assistant OS und Supervisor-App. Ein SMA Sunny Home Manager
+2.0 ist laut Betreiber vorhanden und wurde in evcc als Netzzähler eingerichtet.
+Bei der letzten Prüfung nach einer Korrektur zeigte evcc allerdings **keinen
+Netzzähler**; Ursache und aktueller Zustand sind erneut zu prüfen. SMA-Messwerte
+waren in evcc sichtbar; entsprechende Messentitäten wurden in der geprüften
+HA-Zustandsliste noch nicht gefunden. Netzbezug, Hausgesamtverbrauch und WP-Verbrauch
+sind unterschiedliche Größen; insbesondere ist ein Gesamtwert keine Grundlage
+für eine WP-Arbeitszahl.
+
+Prioritäten der neuen Aufgaben: **P1** verhindert falsche Aussagen oder blockiert
+zuverlässige Inbetriebnahme; **P2** vervollständigt den Betrieb; **P3** ist ergänzend.
+„Offen“ bezeichnet noch nicht umgesetzte Arbeit, „teilweise“ vorhandene, aber
+unvollständige oder nicht ausreichend verifizierte Arbeit.
+
 | # | Titel | Agent | Parallel-Gruppe | Abhängig von | Status und belegte Einschränkung |
 |---|---|---|---|---|---|
 | 1 | Spreizungs-Analyse | analyst | A | – | **fertig** – `analyse/spreizung.py`, `tests/test_spreizung.py`; Bewertung beruht auf den implementierten Richtwerten. |
@@ -15,28 +30,41 @@ Regler-/Home-Assistant-Zugriffe und App-Deployment sind damit nicht nachgewiesen
 | 3 | Heizstab- und Effizienz-Analyse | analyst | B | 1 | **fertig** – `analyse/effizienz.py`, `tests/test_effizienz.py`; AZ setzt geeignete Energie- und Außentemperaturwerte voraus. |
 | 4 | Raumkomfort-Analyse | analyst | C | – | **fertig** – `analyse/komfort.py`, `tests/test_komfort.py`; tatsächliche Raumwerte und Sollwerte müssen bereitgestellt werden. |
 | 5 | Simulation: Fehlerszenarien | tester | A | – | **fertig** – Szenarien und Tests in `simulation.py`, `tests/test_simulation.py`; Simulation ist kein Live-Nachweis. |
-| 6 | Alarm-Grundgerüst mit Telegram/ntfy | alarm | B | – | **fertig** – `AlarmManager` und getesteter ntfy-Melder erfüllen das „und/oder“ im Issue; Telegram ist nicht implementiert. Die Alarmierung ist noch nicht mit einem gestarteten Gesamtprozess verdrahtet, Alarmzustand bleibt im Prozessspeicher. |
-| 7 | SQLite-Speicher | datensammler | B | 2 | **fertig** – Speicher-API und Persistenztests vorhanden; der aktuelle Live-Datenbestand ist davon getrennt und hat noch das alte Schema (siehe Live-Verifikation unten). |
+| 6 | Alarm-Grundgerüst mit Telegram/ntfy | alarm | B | – | **fertig im Code** – ntfy und AlarmManager sind mit dem HA-Scheduler verdrahtet; Telegram fehlt, der Zustand liegt nur im Prozessspeicher. Betriebsfestigkeit siehe 24. |
+| 7 | SQLite-Speicher | datensammler | B | 2 | **fertig im Code** – Speicher-API und Persistenztests vorhanden; Live-DB nutzt das relationale Schema. Backup und Wiederherstellung siehe 23. |
 | 8 | Tagesbericht | analyst | – | 1, 3, 4 | **fertig** – Berichtsgenerator und Tests vorhanden; Datenqualität und Abdeckung begrenzen die Aussage des Berichts. |
-| 9 | Dauerbetrieb (Scheduler: sammeln → analysieren → melden) | architekt → alle | – | 6, 7 | **teilweise** – Funktionen 9a–9c sind vorhanden; integrierter `wpanalyse.run`-Scheduler (9d) fehlt. `monitor`/`ha_monitor` pollen und speichern, führen aber nicht den vollständigen Ablauf aus. |
+| 9 | Dauerbetrieb (Scheduler: sammeln → analysieren → melden) | architekt → alle | – | 6, 7 | **teilweise** – integrierter Scheduler ist für HA vorhanden; direkter Luxtronik-Pfad und Dauerbetriebsvalidierung sind offen (20, 21, 25). |
 | 9a | Sammeln und Speichern orchestrieren | datensammler | D | 2, 7 | **fertig** – `erfassung.py`, `tests/test_erfassung.py`; keine eigene Zeitplanung (wie vorgesehen). |
-| 9b | Regelprüfung und Alarmierung orchestrieren | alarm | D | 1, 3, 4, 6, 7 | **fertig** – `monitoring.py`, `tests/test_monitoring.py`; wird noch nicht durch einen Gesamt-Scheduler regelmäßig gestartet. |
-| 9c | Tagesbericht aus dem Speicher erzeugen | analyst | D | 7, 8 | **fertig** – `tageslauf.py`, `tests/test_tageslauf.py`; wird noch nicht durch einen Gesamt-Scheduler täglich gestartet. |
-| 9d | CLI und Scheduler integrieren | architekt | – | 9a, 9b, 9c | **offen** – `src/wpanalyse/run.py` und `tests/test_run.py` sind nicht vorhanden; kein integrierter Scheduler für 9a–9c. |
-| 10 | Dashboard (Streamlit) | analyst | – | 7 | **fertig** – Dashboard-Code und Hilfsfunktionstests vorhanden; Live-Reglerzugriff mit Streamlit am 07.11.2026 erfolgreich geprüft. Dauerbetrieb ist nicht validiert. |
+| 9b | Regelprüfung und Alarmierung orchestrieren | alarm | D | 1, 3, 4, 6, 7 | **fertig im Code** – `monitoring.py` wird vom HA-Scheduler gestartet; Live-Alarmierung nicht nachgewiesen. |
+| 9c | Tagesbericht aus dem Speicher erzeugen | analyst | D | 7, 8 | **fertig im Code** – `tageslauf.py` wird vom Scheduler täglich aufgerufen; Live-Dauerbetrieb nicht nachgewiesen. |
+| 9d | CLI und Scheduler integrieren | architekt | – | 9a, 9b, 9c | **teilweise** – `run.py` und Tests vorhanden, aktuell mit HA-Adapter; Fehlerbehandlung und direkter Luxtronik-Betrieb siehe 20–21. |
+| 10 | Dashboard (Streamlit) | analyst | – | 7 | **fertig im Code** – Live, Simulation, Heißgaskontext und Zeiträume vorhanden; Live-Zugriff geprüft, Dauerbetrieb und HA-Einbindung offen (20, 25–26). |
 | 11 | Luxtronik-CSV: Feldinventur und fokussierter Import | datensammler | – | – | **teilweise** – generischer `CsvAdapter` existiert; die geforderte `mappe_luxtronik_csv`-Feldzuordnung (inkl. namenloser Zeitspalte) und CSV-spezifische Tests fehlen. |
-| 12 | SQLite-Kernschema für Anlagen und Messwerte | datensammler | – | bestehender SQLite-Speicher | **fertig im Code** – Zieltabellen und Migration in `speicher/sqlite.py`; ein Migrationstest ist in `tests/test_sqlite_speicher.py` vorhanden, aber pytest wurde hier nicht ausgeführt (in der Projektumgebung nicht verfügbar). Die vorhandene `data/wp.sqlite` ist noch nicht migriert; vor dem ersten Öffnen mit dem aktuellen Speicher sichern. |
-| 13 | Raumtemperaturen relational speichern | datensammler | – | 12 | **teilweise** – relationale Raumwerte und Tests vorhanden; umgesetzt über `speichern`/`lese_raum_messwerte` statt der im Issue benannten Methoden `speichere_raeume`/`lese_raeume`; Live-DB noch im Altschema. |
+| 12 | SQLite-Kernschema für Anlagen und Messwerte | datensammler | – | bestehender SQLite-Speicher | **fertig im Code** – Zieltabellen, Migration und Tests vorhanden; Live-DB hat das relationale Schema. Backup vor künftigen Migrationen siehe 23. |
+| 13 | Raumtemperaturen relational speichern | datensammler | – | 12 | **teilweise** – relationale Raumwerte und Tests vorhanden; Schnittstelle weicht vom Issue ab, reale Raumwerte und Sollwerte sind nicht nachgewiesen. |
 | 14 | Störungs- und Wartungsereignisse speichern | datensammler | – | 13 | **teilweise** – Speicherung, Bereichsabfragen und Tests vorhanden; die Methoden heißen `speichern_stoerung`/`speichern_wartung_reparatur` statt der im Issue benannten Schnittstellen. Tatsächliche Ereignisdaten und Live-Migration sind nicht nachgewiesen. |
-| 15 | CI-Qualitätschecks für Python | tester | – | – | **offen** – Ruff und pytest sollen als PR-/Main-Checks laufen; der bestehende Home-Assistant-Image-Build bleibt getrennt. |
-| 16 | Test- und CI-Dokumentation vervollständigen | architekt | – | 15 | **offen** – nach Umsetzung von Issue 15 aktive Workflows, Statusprüfungen und lokale Testbefehle dokumentieren. |
+| 15 | CI-Qualitätschecks für Python | tester | – | – | **teilweise / P1** – Workflow vorhanden; `.[dev]` enthält keine Dashboard-Abhängigkeiten für die aktuellen Tests. Frischen CI-Lauf und Pflichtstatus verifizieren. |
+| 16 | Test- und CI-Dokumentation vervollständigen | architekt | – | 15 | **teilweise** – Dokumentation vorhanden, aber Statusangaben widersprüchlich; nach 15 berichtigen. |
+| 17 | Fehlende Luxtronik-Zustände korrekt behandeln | datensammler | – | – | **offen / P1** – fehlende Laufzeiten werden aktuell als „aus“ abgeleitet. |
+| 18 | SMA/evcc-Zuordnung und Stromdaten für HA/WP-Analyse | datensammler | – | – | **teilweise / P1** – SMA-Werte in evcc gesehen; Netzzähler zuletzt fehlend, HA-Messentitäten und WP-Stromquelle nicht nachgewiesen. Nächste Schritte siehe unten. |
+| 19 | Arbeitszahl fachlich korrekt auswerten | analyst | – | 18 | **teilweise / P1** – Analyse und Dashboard vorhanden; WP-Stromquelle und belastbare Berechnung fehlen. |
+| 20 | Betriebsweg und konkurrierende Reglerabfragen klären | architekt | – | – | **offen / P1** – HA-Scheduler und direkter Luxtronik-Monitor sind getrennte Pfade; Intervallprüfung ist keine Sperre. |
+| 21 | Dauerbetrieb und Wiederanlauf absichern | datensammler | – | 20 | **teilweise / P1** – Scheduler und Monitor vorhanden; Fehler- und Wiederanlaufverhalten nicht ausreichend validiert. |
+| 22 | Messlücken und Datenqualität sichtbar machen | analyst | – | 17, 21 | **teilweise / P1** – Hinweise vorhanden; zuverlässige Lückenüberwachung und aussagekräftige Bewertungen fehlen. |
+| 23 | SQLite-Backup und Wiederherstellung | datensammler | – | – | **offen / P1** – relationales Schema und Integritätsprüfung vorhanden; Backup/Restore praktisch nicht nachgewiesen. |
+| 24 | Alarmzustand und Zustellung absichern | alarm | – | 21, 22 | **teilweise / P2** – ntfy und Entprellung vorhanden, Zustände nur im Speicher; Zustell- und Neustartverhalten prüfen. |
+| 25 | Zielhardware Raspberry Pi 5 / HA OS validieren | tester | – | 15, 20, 21, 23 | **offen / P1** – App und aarch64-Konfiguration vorhanden; Tests auf Zielhardware nicht nachgewiesen. |
+| 26 | Dashboard auf HA-Zielsystem bereitstellen | architekt | – | 20, 25 | **offen / P2** – Streamlit ist derzeit separat und nicht in die HA-App eingebunden. |
+| 27 | Luxtronik-Feldsemantik und Grenzwerte validieren | datensammler | – | – | **teilweise / P2** – Rohwerte werden gespeichert; Einheiten, Verfügbarkeit und Herstellergrenzen sind teils ungeprüft. |
+
+Die neuen Issues haben keine Parallel-Gruppe: Eine parallele Bearbeitung ist erst nach
+Abgleich der tatsächlich betroffenen Dateien und Schnittstellen festzulegen.
 
 #### Zusammenspiel der Teilbereiche
 
-Durchgezogene Pfeile zeigen implementierte Pfade und Funktionsaufrufe; die getrennte
-Darstellung macht sichtbar, dass die Analyse-/Berichtsfunktionen nicht automatisch aus den
-Erfassungspfaden gestartet werden. Gestrichelte Scheduler-Pfeile markieren die noch offene
-zeitgesteuerte Integration.
+Durchgezogene Pfeile zeigen implementierte Codepfade; sie belegen keinen validierten
+Dauerbetrieb. Der integrierte Scheduler nutzt den HA-Adapter; der direkte Luxtronik-Pfad
+ruft diesen Scheduler nicht auf.
 
 ```mermaid
 flowchart LR
@@ -60,11 +88,16 @@ flowchart LR
         haMonitor --> monitor
     end
 
-    subgraph modules[Vorhandene Funktionen, nicht automatisch aus den Live-Pfaden gestartet]
+    subgraph modules[Integrierter HA-Scheduler]
+        scheduler[run.py Scheduler]
         capture[9a Sammeln und Speichern]
         check[9b Regelprüfung und Analysen]
         alarms[AlarmManager / ntfy]
         report[9c Tagesbericht]
+        haAdapter --> scheduler
+        scheduler --> capture
+        scheduler --> check
+        scheduler --> report
         check --> alarms
     end
 
@@ -72,26 +105,20 @@ flowchart LR
     db -->|liest Tageswerte| report
     capture -->|schreibt Messwerte| db
 
-    scheduler[9d CLI / Scheduler offen]
-    scheduler -.-> capture
-    scheduler -.-> check
-    scheduler -.-> report
 ```
 
-#### Live-Verifikation (07.11.2026)
+#### Live-Verifikation (08.11.2026)
 
-Die vorhandene `data/wp.sqlite` wurde **nur lesend** geprüft: 58 Messungen, `PRAGMA
-integrity_check` ergibt `ok`, und es gibt 5 Abstände von mehr als 90 Sekunden. Der
-Live-Reglerzugriff über das Streamlit-Dashboard wurde am 07.11.2026 erfolgreich getestet;
-ein durchgehender oder längerfristiger Dauerbetrieb ist damit nicht validiert. Die Datei
-enthält weiterhin ausschließlich das alte Schema `messwerte(zeit_ns, daten)` und
-`metadaten`; die neuen Tabellen `anlage` und `messwert` fehlen. Die Migration ist zwar
-im aktuellen SQLite-Speichercode implementiert; ein Test mit einer synthetischen
-Testdatenbank ist vorhanden, wurde hier mangels pytest in der Projektumgebung aber nicht
-ausgeführt. An dieser Live-Datei ist die Migration noch nicht erfolgt. **Vor jedem Öffnen mit dem
-aktuellen `SQLiteSpeicher` unbedingt eine Sicherungskopie erstellen**, da dessen
-Initialisierung die Migration automatisch ausführt. Diese Prüfung belegt weder
-ununterbrochenen Betrieb noch die Verfügbarkeit einer externen Quelle oder Betriebsreife.
+Der Live-Reglerzugriff über das Streamlit-Dashboard wurde am 07.11.2026 erfolgreich
+getestet. Bei lesender Prüfung am 08.11.2026 enthielt `data/wp.sqlite` **142 Messungen**, die
+relationalen Zieltabellen und 12 Abstände über 90 Sekunden; der größte betrug etwa
+12 Stunden 23 Minuten. `integrity_check` ergab `ok`. Die Ursachen der Lücken
+sind nicht geklärt. Ein durchgehender oder längerfristiger
+Dauerbetrieb ist nicht validiert. Vor künftigen Migrationen ist eine Sicherung nötig;
+Backup und Wiederherstellung sind gesondert nachzuweisen (Issue 23).
+
+Lokal bestanden am 08.11.2026 **123 Tests** und `ruff check .`; die bestehende
+Umgebung enthält Dashboard-Abhängigkeiten. Das belegt keinen frischen CI-Lauf.
 
 ---
 
@@ -244,7 +271,7 @@ ununterbrochenen Betrieb noch die Verfügbarkeit einer externen Quelle oder Betr
 **Schnittstelle:** GitHub-Actions-Workflow; keine Python-Schnittstelle.
 **Akzeptanzkriterien:**
 - Läuft für alle Pull Requests und Pushes auf `main`, damit Änderungen an Tests oder Konfiguration die Checks nicht durch Pfadfilter überspringen.
-- Installiert das Projekt samt Entwicklungsabhängigkeiten mit `pip install -e ".[dev]"` und führt `ruff check .` sowie `pytest` aus.
+- Installiert das Projekt samt allen für die Tests benötigten Entwicklungs- und Dashboard-Abhängigkeiten in einer frischen Umgebung und führt `ruff check .` sowie `pytest` aus.
 - Prüft mindestens die unterstützte Mindestversion Python 3.11; Umgebungszugangsdaten und Netzwerkzugriff auf Wärmepumpen/Home Assistant sind nicht erforderlich.
 - Bleibt vom Workflow `.github/workflows/build-app.yaml` getrennt: dieser baut/veröffentlicht das Home-Assistant-Image, die neuen Jobs prüfen Codequalität.
 **Testidee:** Workflow-Lauf für einen Pull Request mit grünen Checks prüfen; danach lokal in einem Test-Branch jeweils einen Ruff-Fehler und einen fehlschlagenden Test einführen und sicherstellen, dass der zugehörige Job fehlschlägt. Keine Fehleränderung in den Hauptbranch übernehmen.
@@ -260,3 +287,137 @@ ununterbrochenen Betrieb noch die Verfügbarkeit einer externen Quelle oder Betr
 - Erklärt, welche Statusprüfung vor Merge erforderlich ist und dass der Image-Build kein Ersatz für Test-/Lint-Ergebnisse ist.
 - Trennt umgesetzte Prüfungen klar von manuellen Live-/Deployment-Prüfungen und entfernt veraltete Aussagen über den Workflow-Status.
 **Testidee:** Dokumentierte Befehle mit `pyproject.toml` und Workflow vergleichen; Pfade und Workflow-Namen gegen die tatsächlich vorhandenen Dateien prüfen.
+
+---
+
+### Issue 17 – Fehlende Luxtronik-Zustände korrekt behandeln
+**Status/Priorität:** offen / P1. **Agent:** datensammler. **Abhängigkeit:** keine.
+**Ziel:** Fehlende oder ungültige Laufzeitsignale dürfen nicht als ausgeschalteter Verdichter bzw. Heizstab gelten.
+**Betroffene Dateien:** `src/wpanalyse/adapters/luxtronik.py`, zugehörige Adapter- und Dashboardtests; betroffene Auswertungen nach Bedarf.
+**Schnittstelle:** Bestehende Felder `verdichter_an` und `heizstab_an` bleiben nullable.
+**Akzeptanz:** Vorhandene gültige Signale ergeben den bestätigten Zustand; fehlende oder ungültige Signale bleiben unbekannt. Bei mehreren Heizstufen wird ein unbekannter Gesamtzustand nur dann als aus gewertet, wenn alle dafür nötigen Signale aus sind. Dashboard, Speicherung und Analysen unterscheiden unbekannt von aus.
+**Testidee:** Synthetische Fälle für an, aus, fehlend, ungültig und gemischte Heizstufensignale einschließlich Speicher-Rundlauf und Anzeige prüfen.
+
+### Issue 18 – SMA-Stromquelle und Messbedeutung klären
+**Status/Priorität:** teilweise / P1. **Agent:** datensammler. **Abhängigkeit:** keine.
+**Ziel:** Sunny Home Manager und PV-Zähler in evcc korrekt zuordnen und bestätigte
+Energiedaten als getrennten Kontext nach HA und WP-Analyse bringen.
+
+**Inventurstand vom 08.11.2026:** Vor der Korrektur zeigten Netz- und Solarzähler
+identische Werte; beide Einträge verwendeten dieselbe Geräteadresse, aber unterschiedliche
+Gerätetypen. Der Betreiber hat danach eine Korrektur vorgenommen; eine erfolgreiche
+Neuzuordnung wurde noch nicht nachgewiesen. Beim letzten Aktualisieren zeigte evcc
+unter „Grid“ nur „Add grid meter“; unter „Solar & battery“ waren weiterhin ein
+Solarzähler und ein Batteriespeicher aufgeführt. In den geprüften HA-Zuständen wurden
+keine SMA-/evcc-Messentitäten gefunden, nur eine evcc-Update-Entität. Das evcc-Add-on
+allein belegt nicht, dass die Messwerte als HA-Entitäten verfügbar sind.
+
+**Nächste Schritte, alle P1:**
+1. **Offen – evcc-Netzzähler prüfen:** Konfiguration erneut öffnen; falls weiterhin
+   fehlend, Sunny Home Manager 2.0 als Netzzähler einrichten. Leistungsrichtung,
+   Netzbezug und Einspeisung anhand zuverlässiger Referenzwerte prüfen.
+2. **Offen – Solarzuordnung prüfen:** Tatsächlichen Wechselrichter und dessen Adresse
+   anhand Router-/SMA-Geräteübersicht identifizieren; unabhängig vom Netzzähler als
+   PV-Quelle zuordnen. PV-Leistung und Zählerwerte mit der SMA-Anzeige vergleichen;
+   ggf. auch Batteriezuordnung prüfen. Keine Gerätedaten oder Zugangsdaten einchecken.
+3. **Offen – HA-Anbindung auswählen und einrichten:** Vorzugsweise
+   [ha-evcc über HACS](https://docs.evcc.io/en/smarthome/home-assistant/) prüfen;
+   REST/MQTT sind Alternativen. Installation und eventuellen HA-Neustart mit dem
+   Betreiber abstimmen. MQTT war bei der Inventur in evcc nicht konfiguriert. Die
+   offizielle SMA-Solar-Integration unterstützt den Sunny Home Manager laut ihrer
+   [Dokumentation](https://www.home-assistant.io/integrations/sma/) nicht direkt.
+4. **Offen – Entitäten inventarisieren:** Nach der Anbindung tatsächliche Entity-IDs,
+   Messpunkt, Einheit, Vorzeichen, Aktualisierung und Zählersemantik von Netzbezug,
+   Einspeisung, PV und Batterie prüfen. `unknown`/`unavailable` und veraltete
+   Daten berücksichtigen; Wertvergleich mit evcc und SMA durchführen.
+5. **Offen – WP-Analyse anbinden:** Datenfluss und zeitliche Zuordnung mit Issue 20
+   abstimmen. Netz-, PV- und Batteriegrößen als eigenständige Kontextfelder speichern
+   und visualisieren, nicht als elektrische WP-Leistung oder WP-Energie.
+6. **Offen – WP-Strommessung klären:** Vorhandensein bzw. Nachrüstung eines separaten
+   WP-Zählers und bestätigter Wärmemengenwerte prüfen. Bis dahin keine belastbare
+   WP-Arbeitszahl aus Gesamt-/Netzstrom ableiten (Issue 19).
+
+**Betroffene Dateien:** HA-/Adapterdokumentation, Architektur und gegebenenfalls
+Adapter, Speicher, Dashboard und Tests; Implementierung erst nach bestätigter
+Feldsemantik und Architekturentscheidung.
+**Schnittstelle:** Je Signal Quelle, Entity-ID, Messpunkt, Größe, Einheit, Vorzeichen,
+Aktualität und Energiezählertyp festhalten; WP-Felder bleiben getrennt.
+**Akzeptanz:** Netzbezug, Einspeisung, Hausverbrauch, PV-Erzeugung und etwaige separate
+WP-Messung nicht verwechseln; bei fehlender Quelle keine Werte erfinden. Korrekte
+Zuordnung in evcc und HA anhand realer Werte verifiziert; Anzeige und Speicherung
+von WP-Analyse durch synthetische Tests und einen kontrollierten Live-Vergleich belegt.
+**Testidee:** Inventur mit realen HA-Metadaten und anonymisierten Beispielen; Mapping,
+fehlende oder veraltete Werte sowie Synchronisation synthetisch testen. Änderung an
+Live-Konfiguration erst nach Abstimmung mit dem Betreiber.
+
+### Issue 19 – Arbeitszahl fachlich korrekt auswerten
+**Status/Priorität:** teilweise / P1. **Agent:** analyst. **Abhängigkeit:** 18; eine tatsächliche WP-Stromquelle ist Voraussetzung für eine belastbare WP-AZ.
+**Ziel:** Arbeitszahl ausschließlich aus geeigneter WP-Strom- und Wärmeenergie im gleichen Zeitraum ermitteln.
+**Betroffene Dateien:** `src/wpanalyse/dashboard.py`, `src/wpanalyse/analyse/effizienz.py`, Berichte, Tests und Dokumentation.
+**Schnittstelle:** Bestehende Energie- und Leistungsfelder mit bestätigter Einheit und Herkunft; Gesamtstrom nie als WP-Strom interpretieren.
+**Akzeptanz:** Intervallenergien und kumulative Zähler getrennt behandeln; Zählerwechsel, Rücksetzung, Lücken und nicht synchrone Werte berücksichtigen. Leistungsintegration nur mit geeigneter Zeitgewichtung und ausgewiesener Abdeckung. Ohne ausreichende WP-Energie „nicht auswertbar“ anzeigen, keine Scheingenauigkeit oder Warnung aus unzureichenden Daten.
+**Testidee:** Synthetische gleichmäßige und unregelmäßige Reihen, Zählerdifferenzen/-rücksetzung, Lücken, fehlender WP-Zähler und Hausgesamtstrom.
+
+### Issue 20 – Betriebsweg und konkurrierende Reglerabfragen klären
+**Status/Priorität:** offen / P1. **Agent:** architekt. **Abhängigkeit:** keine.
+**Ziel:** Einen eindeutigen Betriebs- und Datenfluss für HA OS, direkten Luxtronik-Zugriff und Dashboard festlegen.
+**Betroffene Dateien:** `docs/architektur.md`, `docs/luxtronik-anbindung.md`, gegebenenfalls Scheduler, App und Dashboard.
+**Schnittstelle:** Entscheidung für Datenquelle, Zuständigkeit für Sammlung und Zugriff auf gespeicherte Werte; direkte Luxtronik-Abfrage und HA-Pfad explizit unterscheiden.
+**Akzeptanz:** Nur ein definierter Sammler pro Regler bzw. eine wirksame prozessübergreifende Koordination; Überprüfung und Abfrage dürfen nicht als atomar angenommen werden. Dashboard darf den Sammler nicht ungewollt verdoppeln. Umfang der Integration von Analyse, Alarm und Bericht beschreiben; Dokumentationsaussage über angeblich ausgeschlossene Doppelabfragen berichtigen.
+**Testidee:** Zwei konkurrierende Aufrufer und Kombination aus Monitor und Dashboard simulieren; reale Inbetriebnahme erst nach Architekturentscheidung.
+
+### Issue 21 – Dauerbetrieb und Wiederanlauf absichern
+**Status/Priorität:** teilweise / P1. **Agent:** datensammler. **Abhängigkeit:** 20.
+**Ziel:** Störungen von Datenquelle, Speicher und Meldekanal im gewählten Betriebsweg beherrschbar machen.
+**Betroffene Dateien:** `src/wpanalyse/run.py`, Erfassung/Monitor, App-Konfiguration, Tests und Betriebsdokumentation.
+**Schnittstelle:** Verhalten bei temporären und dauerhaften Fehlern, Retry/Backoff und Wiederanlauf explizit festlegen.
+**Akzeptanz:** Fehler sichtbar melden; keine Erfolgsmeldung bei fehlgeschlagenem Lauf. Unterbrechungen führen nicht zu stillen Datenverlusten; Wiederanlaufverhalten und nicht nachholbare Daten sind dokumentiert. Geordnetes Beenden und Wiederaufnahme prüfen; externe Neustartmechanismen nicht ungeprüft voraussetzen.
+**Testidee:** Adapter-, DB- und Netzwerkfehler sowie Neustart mit kontrollierter Uhr und temporärer DB testen; Zielhardwaretest anschließend im Rahmen von 25.
+
+### Issue 22 – Messlücken und Datenqualität sichtbar machen
+**Status/Priorität:** teilweise / P1. **Agent:** analyst. **Abhängigkeit:** 17, 21.
+**Ziel:** Datenabdeckung und veraltete oder fehlende Werte sichtbar machen und Fehlbewertungen vermeiden.
+**Betroffene Dateien:** Dashboard, Analysen, Monitoring, Bericht und Tests.
+**Schnittstelle:** Konfigurierbare erwartete Abtastung und begründete Schwellen für Lücken und Abdeckung.
+**Akzeptanz:** Letzte Messung, Lücken und Teilzeiträume erkennbar darstellen; bei fehlender Abdeckung keine vollständige Messreihe suggerieren. Fehlende Zustände nicht als aus behandeln; Starts und Laufzeiten nicht unbesehen über Lücken extrapolieren. Ein Prozessstillstand benötigt eine davon unabhängige Überwachung; deren Zuständigkeit festlegen.
+**Testidee:** Reihen mit längeren Ausfällen, Einzelwerten und unbekanntem Status für Anzeige, Auswertung und Meldung testen.
+
+### Issue 23 – SQLite-Backup und Wiederherstellung
+**Status/Priorität:** offen / P1. **Agent:** datensammler. **Abhängigkeit:** keine.
+**Ziel:** Ein reproduzierbares Sicherungs- und Wiederherstellungsverfahren für die persistente Datenbank festlegen und erproben.
+**Betroffene Dateien:** Betriebsdokumentation, gegebenenfalls Backup-Werkzeuge und Tests.
+**Schnittstelle:** Sicherungskopie inklusive konsistentem Umgang mit laufenden SQLite-Schreibvorgängen und gegebenenfalls WAL-Dateien.
+**Akzeptanz:** Backup vor Migrationen; Wiederherstellung in separatem Ziel inklusive Integritätsprüfung und Vergleich von Schema und Messwerten nachgewiesen. HA-Supervisor-Backup, Speicherort, Aufbewahrung und Verantwortung für Restore auf Zielsystem prüfen, nicht voraussetzen.
+**Testidee:** Temporäre DB während realistischer Schreibaktivität sichern und getrennt wiederherstellen; Live-Datei für Tests nicht verändern.
+
+### Issue 24 – Alarmzustand und Zustellung absichern
+**Status/Priorität:** teilweise / P2. **Agent:** alarm. **Abhängigkeit:** 21, 22.
+**Ziel:** Zustellung, Entprellung und Entwarnungen auch bei Ausfällen und Neustarts nachvollziehbar gestalten.
+**Betroffene Dateien:** `src/wpanalyse/alarm/`, `src/wpanalyse/monitoring.py`, Tests und Betriebsdokumentation.
+**Schnittstelle:** Persistenz- und Wiederholungsstrategie einschließlich Fehler- und unbekanntem Datenzustand festlegen.
+**Akzeptanz:** Fehlgeschlagene Zustellungen sichtbar; kein unbegründetes „behoben“ bei fehlenden Messwerten. Wiederholungen und Neustartverhalten sind definiert und getestet. Ausfall des gesamten Sammelprozesses kann nicht allein von diesem Prozess gemeldet werden; externe Überwachung klären.
+**Testidee:** Fake-Melder mit Zustellfehler, Wiederherstellung, Neustart und Datenlücke; Live-ntfy separat prüfen.
+
+### Issue 25 – Zielhardware Raspberry Pi 5 mit Home Assistant OS validieren
+**Status/Priorität:** offen / P1. **Agent:** tester. **Abhängigkeit:** 15, 20, 21, 23.
+**Ziel:** Den gewählten Betriebsweg auf einem Raspberry Pi 5 mit Home Assistant OS und Supervisor praktisch abnehmen.
+**Betroffene Dateien:** `docs/home-assistant-betrieb.md` und gegebenenfalls App- oder Testdateien.
+**Schnittstelle:** Versionen von HA OS, Supervisor, App/Image und Architektur sowie Testzeitraum dokumentieren.
+**Akzeptanz:** aarch64-Image bereitstellen, Installation, Konfiguration, Datenfluss und Logs prüfen; Neustart von App und Host, Update, Persistenz und Restore nachweisen. Ausfall und Wiederherstellung der Datenquelle testen; Messabdeckung über einen vereinbarten längeren Testzeitraum dokumentieren. Freigabe erst anhand der Ergebnisse.
+**Testidee:** Wiederholbare Checkliste mit Zeitpunkten, erwarteten und tatsächlichen Ergebnissen; keine Zugangsdaten protokollieren.
+
+### Issue 26 – Dashboard auf HA-Zielsystem bereitstellen
+**Status/Priorität:** offen / P2. **Agent:** architekt. **Abhängigkeit:** 20, 25.
+**Ziel:** Klären und umsetzen, wie das bestehende Streamlit-Dashboard auf dem Zielsystem erreichbar ist.
+**Betroffene Dateien:** Architektur-/Betriebsdokumentation und nach Entscheidung App-Konfiguration und Dashboard.
+**Schnittstelle:** Zugang, Authentifizierung, Datenbankzugriff und Verhältnis zum Sammler vor Umsetzung festlegen.
+**Akzeptanz:** Gewählten Bereitstellungsweg und dessen Sicherheits-/Ressourcengrenzen dokumentieren; keine zusätzlichen unkoordinierten Reglerabfragen. Historie, Zeitauswahl und Logs auf Zielhardware geprüft. Derzeit ist das Dashboard separat, nicht Bestandteil der HA-App.
+**Testidee:** Installations- und Zugriffstest auf Zielhardware sowie gleichzeitige Anzeige bei laufender Erfassung.
+
+### Issue 27 – Luxtronik-Feldsemantik und Grenzwerte validieren
+**Status/Priorität:** teilweise / P2. **Agent:** datensammler. **Abhängigkeit:** keine.
+**Ziel:** Für relevante Rohfelder, Sensoren und Richtwerte belastbare Bedeutung und Eignung klären.
+**Betroffene Dateien:** `src/wpanalyse/config.py`, Adapter- und Fachwissen-Dokumentation, Tests.
+**Schnittstelle:** Pro Feld Quelle, Einheit, gültiger Bereich, Sensorverfügbarkeit und bestätigtes Zählerverhalten festhalten.
+**Akzeptanz:** Unbekannte oder nicht vorhandene Sensoren bleiben als solche kenntlich; keine unbelegten Herstellergrenzen oder Defektdiagnosen. Laufzeit- und Zustandsfelder sowie Heißgas im Betriebskontext mit passenden Unterlagen und Live-Beobachtungen abgleichen.
+**Testidee:** Dokumentierte Referenzwerte und synthetische fehlende/ungültige Sensorwerte gegen Mapping und Anzeige prüfen.
